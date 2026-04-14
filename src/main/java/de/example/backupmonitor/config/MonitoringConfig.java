@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Data
-@ConfigurationProperties(prefix = "backup-monitor")
+@ConfigurationProperties(prefix = "cf-backup-monitor")
 public class MonitoringConfig {
 
     private EncryptionProperties encryption = new EncryptionProperties();

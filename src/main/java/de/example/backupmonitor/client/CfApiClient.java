@@ -175,7 +175,7 @@ public class CfApiClient {
             log.debug("Reusing existing service key {} for S3 instance {}", keyGuid, instanceName);
         } else {
             // Neuen Key anlegen
-            String keyName = "backup-monitor-" + instanceName + "-key";
+            String keyName = "cf-backup-monitor-" + instanceName + "-key";
             String createUrl = cfApiEndpoint(managerId) + "/v3/service_credential_bindings";
             Map<String, Object> body = Map.of(
                     "name", keyName,

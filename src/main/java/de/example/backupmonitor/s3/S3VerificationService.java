@@ -25,10 +25,10 @@ public class S3VerificationService {
     private final S3CheckResultRepository repository;
     private final MetricsPublisher metrics;
 
-    @Value("${backup-monitor.s3-verification.size-tolerance-percent:5}")
+    @Value("${cf-backup-monitor.s3-verification.size-tolerance-percent:5}")
     private int sizeTolerance;
 
-    @Value("${backup-monitor.s3-verification.accessibility-check-bytes:1024}")
+    @Value("${cf-backup-monitor.s3-verification.accessibility-check-bytes:1024}")
     private int accessibilityBytes;
 
     public S3CheckResult verify(String managerId, String instanceId,

@@ -1,4 +1,4 @@
-# Backup Monitor
+# CloudFoundry Backup Monitor
 
 > **[English](#english) | [Deutsch](#deutsch)**
 
@@ -67,10 +67,10 @@ mvn package -DskipTests
 
 # Run with local profile
 TOKEN_ENCRYPTION_KEY=mysecretkey \
-  java -jar target/backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
+  java -jar target/cf-backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
 
 # Run with CF profile (production)
-java -jar target/backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=cf
+java -jar target/cf-backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=cf
 ```
 
 The database schema is applied automatically via Liquibase on startup.
@@ -79,23 +79,23 @@ The database schema is applied automatically via Liquibase on startup.
 
 ### Configuration Reference
 
-All properties are under the `backup-monitor.*` namespace and can be overridden by environment variables.
+All properties are under the `cf-backup-monitor.*` namespace and can be overridden by environment variables.
 
 #### Core / Encryption
 
 | Property | Env variable | Default | Description |
 |---|---|---|---|
-| `backup-monitor.encryption.key` | `TOKEN_ENCRYPTION_KEY` | *(required)* | AES-256-GCM key for encrypting UAA tokens and sandbox passwords at rest |
+| `cf-backup-monitor.encryption.key` | `TOKEN_ENCRYPTION_KEY` | *(required)* | AES-256-GCM key for encrypting UAA tokens and sandbox passwords at rest |
 
 #### Scheduling
 
 | Property | Env variable | Default (cron) | Description |
 |---|---|---|---|
-| `backup-monitor.scheduling.job-check-cron` | `JOB_CHECK_CRON` | `0 0 6 * * *` (06:00 daily) | When to run backup job checks |
-| `backup-monitor.restore-test.cron` | `RESTORE_TEST_CRON` | `0 0 3 * * 0` (03:00 Sundays) | When to run restore tests |
-| `backup-monitor.scheduling.orphan-cleanup-cron` | `ORPHAN_CLEANUP_CRON` | `0 0 4 * * *` (04:00 daily) | When to clean up orphaned CF sandbox instances |
+| `cf-backup-monitor.scheduling.job-check-cron` | `JOB_CHECK_CRON` | `0 0 6 * * *` (06:00 daily) | When to run backup job checks |
+| `cf-backup-monitor.restore-test.cron` | `RESTORE_TEST_CRON` | `0 0 3 * * 0` (03:00 Sundays) | When to run restore tests |
+| `cf-backup-monitor.scheduling.orphan-cleanup-cron` | `ORPHAN_CLEANUP_CRON` | `0 0 4 * * *` (04:00 daily) | When to clean up orphaned CF sandbox instances |
 
-#### Managers (`backup-monitor.managers[]`)
+#### Managers (`cf-backup-monitor.managers[]`)
 
 Each entry represents one OSB backup manager instance.
 
@@ -118,19 +118,19 @@ Each entry represents one OSB backup manager instance.
 
 | Property | Env variable | Default | Description |
 |---|---|---|---|
-| `backup-monitor.s3-verification.enabled` | `S3_VERIFY_ENABLED` | `true` | Enable/disable S3 file verification |
-| `backup-monitor.s3-verification.size-tolerance-percent` | `S3_SIZE_TOLERANCE` | `5` | Allowed deviation (%) between reported and actual S3 file size |
-| `backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Number of bytes to download for the accessibility check |
+| `cf-backup-monitor.s3-verification.enabled` | `S3_VERIFY_ENABLED` | `true` | Enable/disable S3 file verification |
+| `cf-backup-monitor.s3-verification.size-tolerance-percent` | `S3_SIZE_TOLERANCE` | `5` | Allowed deviation (%) between reported and actual S3 file size |
+| `cf-backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Number of bytes to download for the accessibility check |
 
 #### Restore Test
 
 | Property | Env variable | Default | Description |
 |---|---|---|---|
-| `backup-monitor.restore-test.enabled` | `RESTORE_TEST_ENABLED` | `true` | Enable/disable restore tests |
-| `backup-monitor.restore-test.max-parallel` | `RESTORE_TEST_MAX_PARALLEL` | `2` | Maximum number of simultaneous restore tests |
-| `backup-monitor.restore-test.timeout-minutes` | `RESTORE_TEST_TIMEOUT` | `45` | Timeout per restore test in minutes |
+| `cf-backup-monitor.restore-test.enabled` | `RESTORE_TEST_ENABLED` | `true` | Enable/disable restore tests |
+| `cf-backup-monitor.restore-test.max-parallel` | `RESTORE_TEST_MAX_PARALLEL` | `2` | Maximum number of simultaneous restore tests |
+| `cf-backup-monitor.restore-test.timeout-minutes` | `RESTORE_TEST_TIMEOUT` | `45` | Timeout per restore test in minutes |
 
-#### Sandbox Configuration (`backup-monitor.restore-test.sandboxes[]`)
+#### Sandbox Configuration (`cf-backup-monitor.restore-test.sandboxes[]`)
 
 Each entry maps a service instance to its sandbox database.
 
@@ -149,7 +149,7 @@ Each entry maps a service instance to its sandbox database.
 | `provision.plan` | `small` | CF service plan name |
 | `provision.instance-name-prefix` | `restore-test-sandbox` | Prefix for the created CF service instance name |
 
-#### Validation Queries (`backup-monitor.restore-test.validations[]`)
+#### Validation Queries (`cf-backup-monitor.restore-test.validations[]`)
 
 | Property | Description |
 |---|---|
@@ -162,9 +162,9 @@ Each entry maps a service instance to its sandbox database.
 
 | Property | Env variable | Default | Description |
 |---|---|---|---|
-| `backup-monitor.retention.job-check-entries` | `RETENTION_JOB_CHECK` | `30` | How many `JOB_CHECK` runs to retain per instance |
-| `backup-monitor.retention.restore-test-entries` | `RETENTION_RESTORE_TEST` | `10` | How many `RESTORE_TEST` runs to retain per instance |
-| `backup-monitor.retention.s3-check-entries` | `RETENTION_S3_CHECK` | `30` | How many S3 check results to retain per instance |
+| `cf-backup-monitor.retention.job-check-entries` | `RETENTION_JOB_CHECK` | `30` | How many `JOB_CHECK` runs to retain per instance |
+| `cf-backup-monitor.retention.restore-test-entries` | `RETENTION_RESTORE_TEST` | `10` | How many `RESTORE_TEST` runs to retain per instance |
+| `cf-backup-monitor.retention.s3-check-entries` | `RETENTION_S3_CHECK` | `30` | How many S3 check results to retain per instance |
 
 #### Database
 
@@ -329,10 +329,10 @@ mvn package -DskipTests
 
 # Mit lokalem Profil starten
 TOKEN_ENCRYPTION_KEY=meingeheimerschluessel \
-  java -jar target/backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
+  java -jar target/cf-backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
 
 # Mit CF-Profil (Produktion)
-java -jar target/backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=cf
+java -jar target/cf-backup-monitor-0.1.0-SNAPSHOT.jar --spring.profiles.active=cf
 ```
 
 Das Datenbankschema wird beim Start automatisch über Liquibase angewendet.
@@ -341,23 +341,23 @@ Das Datenbankschema wird beim Start automatisch über Liquibase angewendet.
 
 ### Konfigurationsreferenz
 
-Alle Eigenschaften befinden sich unter dem Namespace `backup-monitor.*` und können durch Umgebungsvariablen überschrieben werden.
+Alle Eigenschaften befinden sich unter dem Namespace `cf-backup-monitor.*` und können durch Umgebungsvariablen überschrieben werden.
 
 #### Kern / Verschlüsselung
 
 | Eigenschaft | Umgebungsvariable | Standard | Beschreibung |
 |---|---|---|---|
-| `backup-monitor.encryption.key` | `TOKEN_ENCRYPTION_KEY` | *(erforderlich)* | AES-256-GCM-Schlüssel zur verschlüsselten Ablage von UAA-Tokens und Sandbox-Passwörtern |
+| `cf-backup-monitor.encryption.key` | `TOKEN_ENCRYPTION_KEY` | *(erforderlich)* | AES-256-GCM-Schlüssel zur verschlüsselten Ablage von UAA-Tokens und Sandbox-Passwörtern |
 
 #### Zeitplanung
 
 | Eigenschaft | Umgebungsvariable | Standard (Cron) | Beschreibung |
 |---|---|---|---|
-| `backup-monitor.scheduling.job-check-cron` | `JOB_CHECK_CRON` | `0 0 6 * * *` (täglich 06:00) | Zeitplan für Job-Prüfungen |
-| `backup-monitor.restore-test.cron` | `RESTORE_TEST_CRON` | `0 0 3 * * 0` (sonntags 03:00) | Zeitplan für Restore-Tests |
-| `backup-monitor.scheduling.orphan-cleanup-cron` | `ORPHAN_CLEANUP_CRON` | `0 0 4 * * *` (täglich 04:00) | Zeitplan für die Bereinigung verwaister CF-Sandbox-Instanzen |
+| `cf-backup-monitor.scheduling.job-check-cron` | `JOB_CHECK_CRON` | `0 0 6 * * *` (täglich 06:00) | Zeitplan für Job-Prüfungen |
+| `cf-backup-monitor.restore-test.cron` | `RESTORE_TEST_CRON` | `0 0 3 * * 0` (sonntags 03:00) | Zeitplan für Restore-Tests |
+| `cf-backup-monitor.scheduling.orphan-cleanup-cron` | `ORPHAN_CLEANUP_CRON` | `0 0 4 * * *` (täglich 04:00) | Zeitplan für die Bereinigung verwaister CF-Sandbox-Instanzen |
 
-#### Manager (`backup-monitor.managers[]`)
+#### Manager (`cf-backup-monitor.managers[]`)
 
 Jeder Eintrag repräsentiert eine OSB-Backup-Manager-Instanz.
 
@@ -380,19 +380,19 @@ Jeder Eintrag repräsentiert eine OSB-Backup-Manager-Instanz.
 
 | Eigenschaft | Umgebungsvariable | Standard | Beschreibung |
 |---|---|---|---|
-| `backup-monitor.s3-verification.enabled` | `S3_VERIFY_ENABLED` | `true` | S3-Dateiverifikation aktivieren/deaktivieren |
-| `backup-monitor.s3-verification.size-tolerance-percent` | `S3_SIZE_TOLERANCE` | `5` | Erlaubte Abweichung (%) zwischen gemeldeter und tatsächlicher S3-Dateigröße |
-| `backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Anzahl herunterzuladender Bytes für den Zugriffstest |
+| `cf-backup-monitor.s3-verification.enabled` | `S3_VERIFY_ENABLED` | `true` | S3-Dateiverifikation aktivieren/deaktivieren |
+| `cf-backup-monitor.s3-verification.size-tolerance-percent` | `S3_SIZE_TOLERANCE` | `5` | Erlaubte Abweichung (%) zwischen gemeldeter und tatsächlicher S3-Dateigröße |
+| `cf-backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Anzahl herunterzuladender Bytes für den Zugriffstest |
 
 #### Restore-Test
 
 | Eigenschaft | Umgebungsvariable | Standard | Beschreibung |
 |---|---|---|---|
-| `backup-monitor.restore-test.enabled` | `RESTORE_TEST_ENABLED` | `true` | Restore-Tests aktivieren/deaktivieren |
-| `backup-monitor.restore-test.max-parallel` | `RESTORE_TEST_MAX_PARALLEL` | `2` | Maximale Anzahl gleichzeitiger Restore-Tests |
-| `backup-monitor.restore-test.timeout-minutes` | `RESTORE_TEST_TIMEOUT` | `45` | Timeout pro Restore-Test in Minuten |
+| `cf-backup-monitor.restore-test.enabled` | `RESTORE_TEST_ENABLED` | `true` | Restore-Tests aktivieren/deaktivieren |
+| `cf-backup-monitor.restore-test.max-parallel` | `RESTORE_TEST_MAX_PARALLEL` | `2` | Maximale Anzahl gleichzeitiger Restore-Tests |
+| `cf-backup-monitor.restore-test.timeout-minutes` | `RESTORE_TEST_TIMEOUT` | `45` | Timeout pro Restore-Test in Minuten |
 
-#### Sandbox-Konfiguration (`backup-monitor.restore-test.sandboxes[]`)
+#### Sandbox-Konfiguration (`cf-backup-monitor.restore-test.sandboxes[]`)
 
 Jeder Eintrag ordnet einer Service-Instanz eine Sandbox-Datenbank zu.
 
@@ -411,7 +411,7 @@ Jeder Eintrag ordnet einer Service-Instanz eine Sandbox-Datenbank zu.
 | `provision.plan` | `small` | Name des CF-Service-Plans |
 | `provision.instance-name-prefix` | `restore-test-sandbox` | Präfix für den Namen der erstellten CF-Service-Instanz |
 
-#### Validierungsabfragen (`backup-monitor.restore-test.validations[]`)
+#### Validierungsabfragen (`cf-backup-monitor.restore-test.validations[]`)
 
 | Eigenschaft | Beschreibung |
 |---|---|
@@ -424,9 +424,9 @@ Jeder Eintrag ordnet einer Service-Instanz eine Sandbox-Datenbank zu.
 
 | Eigenschaft | Umgebungsvariable | Standard | Beschreibung |
 |---|---|---|---|
-| `backup-monitor.retention.job-check-entries` | `RETENTION_JOB_CHECK` | `30` | Anzahl beizubehaltender `JOB_CHECK`-Läufe pro Instanz |
-| `backup-monitor.retention.restore-test-entries` | `RETENTION_RESTORE_TEST` | `10` | Anzahl beizubehaltender `RESTORE_TEST`-Läufe pro Instanz |
-| `backup-monitor.retention.s3-check-entries` | `RETENTION_S3_CHECK` | `30` | Anzahl beizubehaltender S3-Prüfergebnisse pro Instanz |
+| `cf-backup-monitor.retention.job-check-entries` | `RETENTION_JOB_CHECK` | `30` | Anzahl beizubehaltender `JOB_CHECK`-Läufe pro Instanz |
+| `cf-backup-monitor.retention.restore-test-entries` | `RETENTION_RESTORE_TEST` | `10` | Anzahl beizubehaltender `RESTORE_TEST`-Läufe pro Instanz |
+| `cf-backup-monitor.retention.s3-check-entries` | `RETENTION_S3_CHECK` | `30` | Anzahl beizubehaltender S3-Prüfergebnisse pro Instanz |
 
 #### Datenbank
 

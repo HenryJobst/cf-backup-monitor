@@ -28,7 +28,7 @@ test:
     - mvn verify
   artifacts:
     paths:
-      - target/backup-monitor-*.jar
+      - target/cf-backup-monitor-*.jar
     expire_in: 1 hour
 
 # ── Deploy (cf push --strategy rolling) ───────────────────────────────────────
@@ -46,7 +46,7 @@ deploy:
     - cf auth "$CF_USERNAME" "$CF_PASSWORD"
     - cf target -o "$CF_ORG" -s "$CF_SPACE"
   script:
-    - cp target/backup-monitor-*.jar target/app.jar
+    - cp target/cf-backup-monitor-*.jar target/app.jar
     - cf push --manifest manifest.yml --strategy rolling
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

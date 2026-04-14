@@ -305,7 +305,7 @@ class CfApiClientTest {
 
         // Auflösen des neuen Keys per Name
         stubFor(get(urlPathEqualTo("/v3/service_credential_bindings"))
-                .withQueryParam("names", equalTo("backup-monitor-my-s3-key"))
+                .withQueryParam("names", equalTo("cf-backup-monitor-my-s3-key"))
                 .willReturn(okJson("""
                         {"resources": [{"guid": "key-guid-new"}]}
                         """)));
@@ -328,7 +328,7 @@ class CfApiClientTest {
 
         verify(postRequestedFor(urlPathEqualTo("/v3/service_credential_bindings"))
                 .withRequestBody(matchingJsonPath("$.name",
-                        equalTo("backup-monitor-my-s3-key")))
+                        equalTo("cf-backup-monitor-my-s3-key")))
                 .withRequestBody(matchingJsonPath("$.type", equalTo("key"))));
     }
 

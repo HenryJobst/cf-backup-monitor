@@ -16,7 +16,7 @@ import java.util.Optional;
  * Legt automatisch einen Backup-Plan an, wenn für eine Service-Instanz keiner existiert
  * und im konfigurierten CF-Space ein S3-Service gefunden wird.
  *
- * <p>Aktivierung: {@code backup-monitor.auto-provision.enabled=true} + {@code cf.space-guid} je Manager.
+ * <p>Aktivierung: {@code cf-backup-monitor.auto-provision.enabled=true} + {@code cf.space-guid} je Manager.
  */
 @Component
 @RequiredArgsConstructor

@@ -7,7 +7,7 @@ spring:
     hibernate:
       ddl-auto: validate
 
-backup-monitor:
+cf-backup-monitor:
   managers:
     - id:   manager-local
       name: "Local Dev Manager"

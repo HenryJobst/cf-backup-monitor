@@ -37,8 +37,8 @@ public class ActuatorSecurityConfig {
     @Bean
     public UserDetailsService userDetailsService(
             PasswordEncoder encoder,
-            @Value("${backup-monitor.actuator.username}") String username,
-            @Value("${backup-monitor.actuator.password}") String password) {
+            @Value("${cf-backup-monitor.actuator.username}") String username,
+            @Value("${cf-backup-monitor.actuator.password}") String password) {
         return new InMemoryUserDetailsManager(
             User.builder()
                 .username(username)

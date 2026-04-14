@@ -1,5 +1,5 @@
 applications:
-- name: backup-monitor
+- name: cf-backup-monitor
   buildpacks:
   - java_buildpack_offline
   path: target/app.jar
@@ -25,7 +25,7 @@ applications:
     MANAGER_1_AGENT_PASSWORD:  ((agent_1_password))
     MANAGER_1_UAA_ENDPOINT:    https://uaa.sys.example.com
     MANAGER_1_CF_API_ENDPOINT: https://api.sys.example.com
-    MANAGER_1_SA_USERNAME:     backup-monitor-sa
+    MANAGER_1_SA_USERNAME:     cf-backup-monitor-sa
     MANAGER_1_SA_PASSWORD:     ((sa_1_password))
     MANAGER_1_INSTANCE_1_ID:   xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     MANAGER_1_INSTANCE_1_NAME: pg-prod-orders

@@ -9,10 +9,10 @@ import org.springframework.security.crypto.encrypt.TextEncryptor;
 @Configuration
 public class EncryptionConfig {
 
-    @Value("${backup-monitor.encryption.key}")
+    @Value("${cf-backup-monitor.encryption.key}")
     private String encryptionKey;
 
-    @Value("${backup-monitor.encryption.salt}")
+    @Value("${cf-backup-monitor.encryption.salt}")
     private String encryptionSalt;
 
     @Bean

@@ -8,7 +8,7 @@ spring:
     hibernate:
       ddl-auto:                validate
 
-backup-monitor:
+cf-backup-monitor:
   managers:
     - id:                      manager-prod-1
       name:                    "Production Manager 1"

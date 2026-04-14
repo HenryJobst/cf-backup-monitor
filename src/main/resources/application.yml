@@ -1,6 +1,6 @@
 spring:
   application:
-    name: backup-monitor
+    name: cf-backup-monitor
   jpa:
     open-in-view: false
     properties:
@@ -23,7 +23,7 @@ management:
       show-details: when-authorized
       roles: ACTUATOR
 
-backup-monitor:
+cf-backup-monitor:
   encryption:
     key: ${TOKEN_ENCRYPTION_KEY}
     salt: ${TOKEN_ENCRYPTION_SALT}
