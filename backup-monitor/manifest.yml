@@ -1,12 +1,15 @@
 applications:
 - name: backup-monitor
   buildpacks:
-  - java_buildpack
-  memory: 512M
-  instances: 1
+  - java_buildpack_offline
+  path: target/app.jar
+  memory: 1G
+  disk_quota: 1G
+  instances: 2
   health-check-type: http
   health-check-http-endpoint: /actuator/health
   env:
+    JBP_CONFIG_OPEN_JDK_JRE:  '{ jre: { version: 21.+ } }'
     SPRING_PROFILES_ACTIVE:    cf
     TOKEN_ENCRYPTION_KEY:      ((token_encryption_key))
 
