@@ -20,11 +20,12 @@ management:
         enabled: true
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
 
 backup-monitor:
   encryption:
     key: ${TOKEN_ENCRYPTION_KEY}
+    salt: ${TOKEN_ENCRYPTION_SALT}
 
   scheduling:
     job-check-cron:            ${JOB_CHECK_CRON:0 0 6 * * *}

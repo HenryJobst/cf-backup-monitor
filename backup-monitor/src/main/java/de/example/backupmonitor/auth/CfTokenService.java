@@ -37,7 +37,7 @@ public class CfTokenService {
         this.encryptor = encryptor;
     }
 
-    public String getValidAccessToken() {
+    public synchronized String getValidAccessToken() {
         if (isLocalCacheValid()) return accessToken;
         if (accessToken == null) loadFromDatabase();
         if (isLocalCacheValid()) return accessToken;

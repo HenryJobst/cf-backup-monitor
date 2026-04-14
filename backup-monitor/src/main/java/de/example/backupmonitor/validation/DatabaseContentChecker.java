@@ -13,11 +13,15 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class DatabaseContentChecker {
+
+    private static final Pattern SELECT_ONLY = Pattern.compile(
+            "^\\s*SELECT\\b.*", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     private final MonitoringConfig config;
 
@@ -43,6 +47,11 @@ public class DatabaseContentChecker {
     }
 
     private QueryCheckResult runSingleCheck(Connection conn, MonitoringConfig.QueryConfig q) {
+        if (!SELECT_ONLY.matcher(q.getSql()).matches()) {
+            log.error("Validation query rejected – only SELECT allowed: {}", q.getDescription());
+            return QueryCheckResult.failed(q.getDescription(), q.getSql(), 0, q.getMinResult(),
+                    "Query rejected: only SELECT statements are permitted");
+        }
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(q.getSql())) {
             long result = rs.next() ? rs.getLong(1) : 0;

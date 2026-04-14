@@ -36,7 +36,16 @@ public class S3ClientFactory {
         }
 
         if (Boolean.TRUE.equals(destination.getSkipSSL())) {
-            log.warn("SSL validation disabled for S3 endpoint: {}", destination.getEndpoint());
+            String endpoint = destination.getEndpoint();
+            if (endpoint == null || !endpoint.startsWith("http://")
+                    && !endpoint.contains("localhost")
+                    && !endpoint.contains("127.0.0.1")
+                    && !endpoint.contains(".internal")) {
+                log.error("SSL validation disabled for non-internal S3 endpoint '{}'. "
+                        + "This is a security risk – use a custom CA truststore instead.", endpoint);
+            } else {
+                log.warn("SSL validation disabled for S3 endpoint: {}", endpoint);
+            }
             builder.httpClient(buildInsecureHttpClient());
         }
 
