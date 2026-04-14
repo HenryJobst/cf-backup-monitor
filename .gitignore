@@ -20,3 +20,6 @@ target/
 # Lokale Konfiguration (enthält Secrets)
 .env
 backup-monitor/.env
+
+# Claude Code
+.claude/
