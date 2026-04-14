@@ -55,10 +55,8 @@ databaseChangeLog:
                   constraints:
                     nullable: false
                   defaultValueComputed: NOW()
-        - addCheckConstraint:
-            tableName: restore_test_result
-            constraintName: chk_restore_status
-            constraintBody: "restore_status IN ('SUCCEEDED','FAILED','TIMEOUT','NO_RESOURCES','SKIPPED')"
+        - sql:
+            sql: "ALTER TABLE restore_test_result ADD CONSTRAINT chk_restore_status CHECK (restore_status IN ('SUCCEEDED','FAILED','TIMEOUT','NO_RESOURCES','SKIPPED'))"
         - createIndex:
             tableName: restore_test_result
             indexName: idx_restore_result_instance_time

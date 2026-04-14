@@ -66,10 +66,8 @@ databaseChangeLog:
             tableName: sandbox_registry
             columnNames: instance_id
             constraintName: uq_sandbox_registry_instance
-        - addCheckConstraint:
-            tableName: sandbox_registry
-            constraintName: chk_sandbox_mode
-            constraintBody: "mode IN ('EXISTING', 'PROVISION')"
+        - sql:
+            sql: "ALTER TABLE sandbox_registry ADD CONSTRAINT chk_sandbox_mode CHECK (mode IN ('EXISTING', 'PROVISION'))"
         - createIndex:
             tableName: sandbox_registry
             indexName: idx_sandbox_registry_instance

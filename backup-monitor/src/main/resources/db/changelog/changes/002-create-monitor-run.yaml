@@ -53,14 +53,10 @@ databaseChangeLog:
               - column:
                   name: error_message
                   type: TEXT
-        - addCheckConstraint:
-            tableName: monitor_run
-            constraintName: chk_monitor_run_type
-            constraintBody: "run_type IN ('JOB_CHECK', 'RESTORE_TEST')"
-        - addCheckConstraint:
-            tableName: monitor_run
-            constraintName: chk_monitor_run_status
-            constraintBody: "status IN ('OK', 'FAILED', 'SKIPPED', 'ERROR', 'RUNNING')"
+        - sql:
+            sql: "ALTER TABLE monitor_run ADD CONSTRAINT chk_monitor_run_type CHECK (run_type IN ('JOB_CHECK', 'RESTORE_TEST'))"
+        - sql:
+            sql: "ALTER TABLE monitor_run ADD CONSTRAINT chk_monitor_run_status CHECK (status IN ('OK', 'FAILED', 'SKIPPED', 'ERROR', 'RUNNING'))"
         - createIndex:
             tableName: monitor_run
             indexName: idx_monitor_run_instance_type_time
