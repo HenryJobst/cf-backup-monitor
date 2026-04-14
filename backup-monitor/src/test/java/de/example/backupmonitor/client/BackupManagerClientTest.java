@@ -45,43 +45,48 @@ class BackupManagerClientTest {
         client = new BackupManagerClient(config, tokenRegistry);
     }
 
+    // ── getBackupPlan ──────────────────────────────────────────────────────────
+
     @Test
     void getBackupPlan_planExists_returnsPlan() {
-        stubFor(get(urlEqualTo("/v2/service_instances/" + INSTANCE_ID + "/backup_plans"))
+        stubFor(get(urlPathEqualTo("/backupPlans/byInstance/" + INSTANCE_ID))
                 .willReturn(okJson("""
-                        [{"id":"plan-1","instance_id":"%s","active":true,"paused":false}]
-                        """.formatted(INSTANCE_ID))));
+                        {"content":[{"id":"plan-1","paused":false}],"totalElements":1}
+                        """)));
 
         Optional<BackupPlan> result = client.getBackupPlan(MANAGER_ID, INSTANCE_ID);
 
         assertThat(result).isPresent();
         assertThat(result.get().getIdAsString()).isEqualTo("plan-1");
-        assertThat(result.get().isActive()).isTrue();
         assertThat(result.get().isPaused()).isFalse();
     }
 
     @Test
-    void getBackupPlan_emptyList_returnsEmpty() {
-        stubFor(get(urlEqualTo("/v2/service_instances/" + INSTANCE_ID + "/backup_plans"))
-                .willReturn(okJson("[]")));
+    void getBackupPlan_emptyContent_returnsEmpty() {
+        stubFor(get(urlPathEqualTo("/backupPlans/byInstance/" + INSTANCE_ID))
+                .willReturn(okJson("""
+                        {"content":[],"totalElements":0}
+                        """)));
 
         assertThat(client.getBackupPlan(MANAGER_ID, INSTANCE_ID)).isEmpty();
     }
 
     @Test
     void getBackupPlan_serverError_returnsEmpty() {
-        stubFor(get(urlEqualTo("/v2/service_instances/" + INSTANCE_ID + "/backup_plans"))
+        stubFor(get(urlPathEqualTo("/backupPlans/byInstance/" + INSTANCE_ID))
                 .willReturn(serverError()));
 
         assertThat(client.getBackupPlan(MANAGER_ID, INSTANCE_ID)).isEmpty();
     }
 
+    // ── getLatestJob ───────────────────────────────────────────────────────────
+
     @Test
     void getLatestJob_jobFound_returnsJob() {
-        stubFor(get(urlEqualTo("/v2/service_instances/" + INSTANCE_ID + "/backup_jobs?limit=1"))
+        stubFor(get(urlPathEqualTo("/backupJobs/byInstance/" + INSTANCE_ID))
                 .willReturn(okJson("""
-                        [{"id":"job-42","instance_id":"%s","status":"SUCCEEDED"}]
-                        """.formatted(INSTANCE_ID))));
+                        {"content":[{"id":"job-42","status":"SUCCEEDED"}],"totalElements":1}
+                        """)));
 
         Optional<BackupJob> result = client.getLatestJob(MANAGER_ID, INSTANCE_ID);
 
@@ -91,20 +96,24 @@ class BackupManagerClientTest {
     }
 
     @Test
-    void getLatestJob_emptyList_returnsEmpty() {
-        stubFor(get(urlEqualTo("/v2/service_instances/" + INSTANCE_ID + "/backup_jobs?limit=1"))
-                .willReturn(okJson("[]")));
+    void getLatestJob_emptyContent_returnsEmpty() {
+        stubFor(get(urlPathEqualTo("/backupJobs/byInstance/" + INSTANCE_ID))
+                .willReturn(okJson("""
+                        {"content":[],"totalElements":0}
+                        """)));
 
         assertThat(client.getLatestJob(MANAGER_ID, INSTANCE_ID)).isEmpty();
     }
 
+    // ── getLatestBackupJob ─────────────────────────────────────────────────────
+
     @Test
     void getLatestBackupJob_succeededJobFound_returnsJob() {
-        stubFor(get(urlEqualTo("/v2/service_instances/" + INSTANCE_ID
-                + "/backup_jobs?status=SUCCEEDED&limit=1"))
+        stubFor(get(urlPathEqualTo("/backupJobs/byInstance/" + INSTANCE_ID + "/filtered"))
+                .withQueryParam("jobStatus", equalTo("SUCCEEDED"))
                 .willReturn(okJson("""
-                        [{"id":"job-99","instance_id":"%s","status":"SUCCEEDED"}]
-                        """.formatted(INSTANCE_ID))));
+                        {"content":[{"id":"job-99","status":"SUCCEEDED"}],"totalElements":1}
+                        """)));
 
         Optional<BackupJob> result = client.getLatestBackupJob(MANAGER_ID, INSTANCE_ID);
 
@@ -112,12 +121,14 @@ class BackupManagerClientTest {
         assertThat(result.get().getStatus()).isEqualTo(JobStatus.SUCCEEDED);
     }
 
+    // ── getJobById ─────────────────────────────────────────────────────────────
+
     @Test
     void getJobById_found_returnsJob() {
-        stubFor(get(urlEqualTo("/v2/backup_jobs/job-77"))
+        stubFor(get(urlEqualTo("/backupJobs/job-77"))
                 .willReturn(okJson("""
-                        {"id":"job-77","instance_id":"%s","status":"FAILED"}
-                        """.formatted(INSTANCE_ID))));
+                        {"id":"job-77","status":"FAILED"}
+                        """)));
 
         Optional<BackupJob> result = client.getJobById(MANAGER_ID, "job-77");
 
@@ -128,20 +139,24 @@ class BackupManagerClientTest {
 
     @Test
     void getJobById_notFound_returnsEmpty() {
-        stubFor(get(urlEqualTo("/v2/backup_jobs/missing-job"))
+        stubFor(get(urlEqualTo("/backupJobs/missing-job"))
                 .willReturn(notFound()));
 
         assertThat(client.getJobById(MANAGER_ID, "missing-job")).isEmpty();
     }
 
+    // ── Auth ───────────────────────────────────────────────────────────────────
+
     @Test
     void bearerToken_isSentWithEveryRequest() {
-        stubFor(get(urlEqualTo("/v2/service_instances/" + INSTANCE_ID + "/backup_plans"))
-                .willReturn(okJson("[]")));
+        stubFor(get(urlPathEqualTo("/backupPlans/byInstance/" + INSTANCE_ID))
+                .willReturn(okJson("""
+                        {"content":[],"totalElements":0}
+                        """)));
 
         client.getBackupPlan(MANAGER_ID, INSTANCE_ID);
 
-        verify(getRequestedFor(urlEqualTo("/v2/service_instances/" + INSTANCE_ID + "/backup_plans"))
+        verify(getRequestedFor(urlPathEqualTo("/backupPlans/byInstance/" + INSTANCE_ID))
                 .withHeader("Authorization", equalTo("Bearer test-bearer-token")));
     }
 }

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
-        @JsonSubTypes.Type(value = S3FileDestination.class, name = "s3")
+        @JsonSubTypes.Type(value = S3FileDestination.class, name = "S3")
 })
 public abstract class FileDestination {
 

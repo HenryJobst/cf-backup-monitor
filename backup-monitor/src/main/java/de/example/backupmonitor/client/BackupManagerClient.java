@@ -1,5 +1,6 @@
 package de.example.backupmonitor.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.example.backupmonitor.auth.BearerTokenInterceptor;
 import de.example.backupmonitor.auth.CfTokenServiceRegistry;
 import de.example.backupmonitor.config.MonitoringConfig;
@@ -10,6 +11,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,13 +33,13 @@ public class BackupManagerClient {
     public Optional<BackupPlan> getBackupPlan(String managerId, String instanceId) {
         try {
             ManagerEndpoint ep = endpoints.get(managerId);
-            String url = ep.url + "/v2/service_instances/" + instanceId + "/backup_plans";
-            List<BackupPlan> plans = ep.restClient.get()
+            String url = ep.url + "/backupPlans/byInstance/" + instanceId + "?size=1";
+            PageContent<BackupPlan> page = ep.restClient.get()
                     .uri(url)
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
-            if (plans == null || plans.isEmpty()) return Optional.empty();
-            return Optional.of(plans.get(0));
+            if (page == null || page.getContent().isEmpty()) return Optional.empty();
+            return Optional.of(page.getContent().get(0));
         } catch (Exception e) {
             log.warn("Failed to get backup plan for instance {}: {}", instanceId, e.getMessage());
             return Optional.empty();
@@ -47,14 +49,14 @@ public class BackupManagerClient {
     public Optional<BackupJob> getLatestBackupJob(String managerId, String instanceId) {
         try {
             ManagerEndpoint ep = endpoints.get(managerId);
-            String url = ep.url + "/v2/service_instances/" + instanceId
-                    + "/backup_jobs?status=SUCCEEDED&limit=1";
-            List<BackupJob> jobs = ep.restClient.get()
+            String url = ep.url + "/backupJobs/byInstance/" + instanceId
+                    + "/filtered?jobStatus=SUCCEEDED&size=1&sort=startDate,desc";
+            PageContent<BackupJob> page = ep.restClient.get()
                     .uri(url)
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
-            if (jobs == null || jobs.isEmpty()) return Optional.empty();
-            return Optional.of(jobs.get(0));
+            if (page == null || page.getContent().isEmpty()) return Optional.empty();
+            return Optional.of(page.getContent().get(0));
         } catch (Exception e) {
             log.warn("Failed to get latest backup job for instance {}: {}", instanceId, e.getMessage());
             return Optional.empty();
@@ -64,13 +66,14 @@ public class BackupManagerClient {
     public Optional<BackupJob> getLatestJob(String managerId, String instanceId) {
         try {
             ManagerEndpoint ep = endpoints.get(managerId);
-            String url = ep.url + "/v2/service_instances/" + instanceId + "/backup_jobs?limit=1";
-            List<BackupJob> jobs = ep.restClient.get()
+            String url = ep.url + "/backupJobs/byInstance/" + instanceId
+                    + "?size=1&sort=startDate,desc";
+            PageContent<BackupJob> page = ep.restClient.get()
                     .uri(url)
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
-            if (jobs == null || jobs.isEmpty()) return Optional.empty();
-            return Optional.of(jobs.get(0));
+            if (page == null || page.getContent().isEmpty()) return Optional.empty();
+            return Optional.of(page.getContent().get(0));
         } catch (Exception e) {
             log.warn("Failed to get latest job for instance {}: {}", instanceId, e.getMessage());
             return Optional.empty();
@@ -80,16 +83,24 @@ public class BackupManagerClient {
     public Optional<BackupJob> getJobById(String managerId, String jobId) {
         try {
             ManagerEndpoint ep = endpoints.get(managerId);
-            String url = ep.url + "/v2/backup_jobs/" + jobId;
+            String url = ep.url + "/backupJobs/" + jobId;
             BackupJob job = ep.restClient.get()
                     .uri(url)
                     .retrieve()
                     .body(BackupJob.class);
             return Optional.ofNullable(job);
         } catch (Exception e) {
-            log.warn("Failed to get job {} : {}", jobId, e.getMessage());
+            log.warn("Failed to get job {}: {}", jobId, e.getMessage());
             return Optional.empty();
         }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class PageContent<T> {
+        private List<T> content = new ArrayList<>();
+
+        public List<T> getContent() { return content; }
+        public void setContent(List<T> content) { this.content = content; }
     }
 
     private static class ManagerEndpoint {

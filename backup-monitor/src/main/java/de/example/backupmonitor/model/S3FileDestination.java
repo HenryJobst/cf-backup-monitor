@@ -7,7 +7,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class S3FileDestination extends FileDestination {
 
-    private String type = "s3";
+    private String type = "S3";
     private String bucket;
     private String endpoint;
     private String region;

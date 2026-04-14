@@ -17,17 +17,15 @@ public class BackupJob {
 
     private JobStatus status;
 
-    @JsonProperty("start_date")
     private Instant startDate;
 
-    @JsonProperty("end_date")
     private Instant endDate;
 
     private FileDestination destination;
 
     private Map<String, String> files = new HashMap<>();
 
-    @JsonProperty("agent_execution_reponses")
+    @JsonProperty("agentExecutionReponses")
     private Map<String, AgentExecutionResponse> agentExecutionReponses = new HashMap<>();
 
     private Long filesize;

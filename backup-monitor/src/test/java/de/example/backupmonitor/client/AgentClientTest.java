@@ -34,10 +34,12 @@ class AgentClientTest {
         client = new AgentClient(config);
     }
 
+    // ── triggerRestore ─────────────────────────────────────────────────────────
+
     @Test
-    void triggerRestore_success_returnsJobId() {
-        stubFor(post(urlEqualTo("/v2/restore_jobs"))
-                .willReturn(aResponse().withStatus(201)));
+    void triggerRestore_sendsCorrectRequestAndReturnsJobId() {
+        stubFor(put(urlEqualTo("/restore"))
+                .willReturn(aResponse().withStatus(200).withBody("{}")));
 
         String returned = client.triggerRestore(
                 MANAGER_ID, JOB_ID,
@@ -45,27 +47,46 @@ class AgentClientTest {
                 buildSandbox());
 
         assertThat(returned).isEqualTo(JOB_ID);
-        verify(postRequestedFor(urlEqualTo("/v2/restore_jobs"))
-                .withHeader("Authorization", containing("Basic ")));
+        verify(putRequestedFor(urlEqualTo("/restore"))
+                .withHeader("Authorization", containing("Basic "))
+                .withRequestBody(matchingJsonPath("$.id", equalTo(JOB_ID)))
+                .withRequestBody(matchingJsonPath("$.destination.type", equalTo("S3")))
+                .withRequestBody(matchingJsonPath("$.destination.bucket", equalTo("my-bucket")))
+                .withRequestBody(matchingJsonPath("$.destination.filename", equalTo("backup.tar.gz")))
+                .withRequestBody(matchingJsonPath("$.restore.host", equalTo("sandbox-host")))
+                .withRequestBody(matchingJsonPath("$.restore.database", equalTo("restore_db"))));
     }
+
+    @Test
+    void triggerRestore_mapsS3EndpointToAuthUrl() {
+        stubFor(put(urlEqualTo("/restore"))
+                .willReturn(aResponse().withStatus(200).withBody("{}")));
+
+        client.triggerRestore(MANAGER_ID, JOB_ID, buildDestination(), "backup.tar.gz", buildSandbox());
+
+        verify(putRequestedFor(urlEqualTo("/restore"))
+                .withRequestBody(matchingJsonPath("$.destination.authUrl",
+                        equalTo("https://s3.example.com"))));
+    }
+
+    // ── pollStatus ─────────────────────────────────────────────────────────────
 
     @Test
     void pollStatus_running_returnsRunning() {
-        stubFor(get(urlEqualTo("/v2/restore_jobs/" + JOB_ID))
+        stubFor(get(urlEqualTo("/restore/" + JOB_ID))
                 .willReturn(okJson("""
-                        {"status":"RUNNING"}
+                        {"status":"running","state":"restore"}
                         """)));
 
-        AgentClient.AgentRestoreStatus status = client.pollStatus(MANAGER_ID, JOB_ID);
-
-        assertThat(status).isEqualTo(AgentClient.AgentRestoreStatus.RUNNING);
+        assertThat(client.pollStatus(MANAGER_ID, JOB_ID))
+                .isEqualTo(AgentClient.AgentRestoreStatus.RUNNING);
     }
 
     @Test
-    void pollStatus_succeeded_returnsSucceeded() {
-        stubFor(get(urlEqualTo("/v2/restore_jobs/" + JOB_ID))
+    void pollStatus_success_returnsSucceeded() {
+        stubFor(get(urlEqualTo("/restore/" + JOB_ID))
                 .willReturn(okJson("""
-                        {"status":"SUCCEEDED"}
+                        {"status":"success","state":"finished"}
                         """)));
 
         assertThat(client.pollStatus(MANAGER_ID, JOB_ID))
@@ -74,9 +95,9 @@ class AgentClientTest {
 
     @Test
     void pollStatus_failed_returnsFailed() {
-        stubFor(get(urlEqualTo("/v2/restore_jobs/" + JOB_ID))
+        stubFor(get(urlEqualTo("/restore/" + JOB_ID))
                 .willReturn(okJson("""
-                        {"status":"FAILED"}
+                        {"status":"failed","state":"restore"}
                         """)));
 
         assertThat(client.pollStatus(MANAGER_ID, JOB_ID))
@@ -85,7 +106,7 @@ class AgentClientTest {
 
     @Test
     void pollStatus_serverError_returnsUnknown() {
-        stubFor(get(urlEqualTo("/v2/restore_jobs/" + JOB_ID))
+        stubFor(get(urlEqualTo("/restore/" + JOB_ID))
                 .willReturn(serverError()));
 
         assertThat(client.pollStatus(MANAGER_ID, JOB_ID))
@@ -94,14 +115,16 @@ class AgentClientTest {
 
     @Test
     void pollStatus_unknownStatusString_returnsUnknown() {
-        stubFor(get(urlEqualTo("/v2/restore_jobs/" + JOB_ID))
+        stubFor(get(urlEqualTo("/restore/" + JOB_ID))
                 .willReturn(okJson("""
-                        {"status":"SOMETHING_UNEXPECTED"}
+                        {"status":"something_unexpected"}
                         """)));
 
         assertThat(client.pollStatus(MANAGER_ID, JOB_ID))
                 .isEqualTo(AgentClient.AgentRestoreStatus.UNKNOWN);
     }
+
+    // ── Hilfsmethoden ─────────────────────────────────────────────────────────
 
     private S3FileDestination buildDestination() {
         S3FileDestination dest = new S3FileDestination();
