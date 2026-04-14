@@ -19,17 +19,34 @@ class BackupPlanMonitorTest {
     @Mock
     private BackupManagerClient managerClient;
 
+    @Mock
+    private BackupPlanProvisioner provisioner;
+
     @InjectMocks
     private BackupPlanMonitor planMonitor;
 
     @Test
-    void checkPlan_noPlan_returnsFailed() {
+    void checkPlan_noPlan_provisionerAlsoEmpty_returnsFailed() {
         when(managerClient.getBackupPlan("mgr", "inst")).thenReturn(Optional.empty());
+        when(provisioner.tryProvision("mgr", "inst")).thenReturn(Optional.empty());
 
         PlanCheckResult result = planMonitor.checkPlan("mgr", "inst");
 
         assertThat(result.isOk()).isFalse();
         assertThat(result.getMessage()).contains("No backup plan");
+    }
+
+    @Test
+    void checkPlan_noPlan_provisionerCreates_returnsOk() {
+        BackupPlan provisioned = new BackupPlan();
+        provisioned.setPaused(false);
+        when(managerClient.getBackupPlan("mgr", "inst")).thenReturn(Optional.empty());
+        when(provisioner.tryProvision("mgr", "inst")).thenReturn(Optional.of(provisioned));
+
+        PlanCheckResult result = planMonitor.checkPlan("mgr", "inst");
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(result.getPlan()).isSameAs(provisioned);
     }
 
     @Test

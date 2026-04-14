@@ -121,6 +121,242 @@ class CfApiClientTest {
                 .hasMessageContaining("Timeout");
     }
 
+    // ── findServiceInstancesByOffering ────────────────────────────────────────
+
+    @Test
+    void findServiceInstancesByOffering_matchingOffering_returnsCandidate() {
+        stubFor(get(urlPathEqualTo("/v3/service_instances"))
+                .willReturn(okJson("""
+                        {
+                          "resources": [{
+                            "guid": "inst-s3-guid",
+                            "name": "my-s3",
+                            "relationships": {
+                              "service_plan": {"data": {"guid": "plan-guid"}}
+                            }
+                          }],
+                          "included": {
+                            "service_plans": [{
+                              "guid": "plan-guid",
+                              "relationships": {
+                                "service_offering": {"data": {"guid": "offering-guid"}}
+                              }
+                            }],
+                            "service_offerings": [{"guid": "offering-guid", "name": "s3"}]
+                          }
+                        }
+                        """)));
+
+        List<CfApiClient.S3ServiceCandidate> result =
+                client.findServiceInstancesByOffering(MANAGER_ID, "space-guid", "s3");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).guid()).isEqualTo("inst-s3-guid");
+        assertThat(result.get(0).name()).isEqualTo("my-s3");
+    }
+
+    @Test
+    void findServiceInstancesByOffering_differentOffering_returnsEmpty() {
+        stubFor(get(urlPathEqualTo("/v3/service_instances"))
+                .willReturn(okJson("""
+                        {
+                          "resources": [{
+                            "guid": "inst-pg-guid",
+                            "name": "my-postgres",
+                            "relationships": {
+                              "service_plan": {"data": {"guid": "plan-guid"}}
+                            }
+                          }],
+                          "included": {
+                            "service_plans": [{
+                              "guid": "plan-guid",
+                              "relationships": {
+                                "service_offering": {"data": {"guid": "offering-guid"}}
+                              }
+                            }],
+                            "service_offerings": [{"guid": "offering-guid", "name": "postgresql"}]
+                          }
+                        }
+                        """)));
+
+        List<CfApiClient.S3ServiceCandidate> result =
+                client.findServiceInstancesByOffering(MANAGER_ID, "space-guid", "s3");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findServiceInstancesByOffering_multipleInstances_returnsMatchingOnly() {
+        stubFor(get(urlPathEqualTo("/v3/service_instances"))
+                .willReturn(okJson("""
+                        {
+                          "resources": [
+                            {
+                              "guid": "inst-s3",
+                              "name": "s3-service",
+                              "relationships": {"service_plan": {"data": {"guid": "plan-s3"}}}
+                            },
+                            {
+                              "guid": "inst-pg",
+                              "name": "pg-service",
+                              "relationships": {"service_plan": {"data": {"guid": "plan-pg"}}}
+                            }
+                          ],
+                          "included": {
+                            "service_plans": [
+                              {
+                                "guid": "plan-s3",
+                                "relationships": {
+                                  "service_offering": {"data": {"guid": "off-s3"}}
+                                }
+                              },
+                              {
+                                "guid": "plan-pg",
+                                "relationships": {
+                                  "service_offering": {"data": {"guid": "off-pg"}}
+                                }
+                              }
+                            ],
+                            "service_offerings": [
+                              {"guid": "off-s3", "name": "s3"},
+                              {"guid": "off-pg", "name": "postgresql"}
+                            ]
+                          }
+                        }
+                        """)));
+
+        List<CfApiClient.S3ServiceCandidate> result =
+                client.findServiceInstancesByOffering(MANAGER_ID, "space-guid", "s3");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).guid()).isEqualTo("inst-s3");
+    }
+
+    @Test
+    void findServiceInstancesByOffering_apiError_returnsEmpty() {
+        stubFor(get(urlPathEqualTo("/v3/service_instances"))
+                .willReturn(serverError()));
+
+        List<CfApiClient.S3ServiceCandidate> result =
+                client.findServiceInstancesByOffering(MANAGER_ID, "space-guid", "s3");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findServiceInstancesByOffering_emptyResources_returnsEmpty() {
+        stubFor(get(urlPathEqualTo("/v3/service_instances"))
+                .willReturn(okJson("""
+                        {"resources": [], "included": {}}
+                        """)));
+
+        assertThat(client.findServiceInstancesByOffering(MANAGER_ID, "space-guid", "s3")).isEmpty();
+    }
+
+    // ── getS3Credentials ──────────────────────────────────────────────────────
+
+    @Test
+    void getS3Credentials_existingKey_reusesItWithoutCreating() {
+        // Liste vorhandener Keys → ein Key gefunden
+        stubFor(get(urlPathEqualTo("/v3/service_credential_bindings"))
+                .withQueryParam("service_instance_guids", equalTo("inst-guid"))
+                .withQueryParam("type", equalTo("key"))
+                .willReturn(okJson("""
+                        {"resources": [{"guid": "key-guid-existing"}]}
+                        """)));
+
+        // Details des Keys
+        stubFor(get(urlPathEqualTo("/v3/service_credential_bindings/key-guid-existing/details"))
+                .willReturn(okJson("""
+                        {"credentials": {
+                          "access_key_id": "AKID",
+                          "secret_access_key": "SECRET",
+                          "bucket": "my-bucket",
+                          "endpoint": "https://s3.example.com",
+                          "region": "eu-central-1"
+                        }}
+                        """)));
+
+        var dest = client.getS3Credentials(MANAGER_ID, "inst-guid", "my-s3");
+
+        assertThat(dest.getAuthKey()).isEqualTo("AKID");
+        assertThat(dest.getAuthSecret()).isEqualTo("SECRET");
+        assertThat(dest.getBucket()).isEqualTo("my-bucket");
+        assertThat(dest.getEndpoint()).isEqualTo("https://s3.example.com");
+        assertThat(dest.getRegion()).isEqualTo("eu-central-1");
+
+        // kein POST – vorhandener Key wurde wiederverwendet
+        verify(0, postRequestedFor(urlPathEqualTo("/v3/service_credential_bindings")));
+    }
+
+    @Test
+    void getS3Credentials_noExistingKey_createsNewKey() {
+        // keine vorhandenen Keys
+        stubFor(get(urlPathEqualTo("/v3/service_credential_bindings"))
+                .withQueryParam("service_instance_guids", equalTo("inst-guid"))
+                .withQueryParam("type", equalTo("key"))
+                .willReturn(okJson("""
+                        {"resources": []}
+                        """)));
+
+        // POST neuer Key
+        stubFor(post(urlPathEqualTo("/v3/service_credential_bindings"))
+                .willReturn(aResponse().withStatus(201)));
+
+        // Auflösen des neuen Keys per Name
+        stubFor(get(urlPathEqualTo("/v3/service_credential_bindings"))
+                .withQueryParam("names", equalTo("backup-monitor-my-s3-key"))
+                .willReturn(okJson("""
+                        {"resources": [{"guid": "key-guid-new"}]}
+                        """)));
+
+        // Details des neuen Keys
+        stubFor(get(urlPathEqualTo("/v3/service_credential_bindings/key-guid-new/details"))
+                .willReturn(okJson("""
+                        {"credentials": {
+                          "access_key_id": "NEW-AKID",
+                          "secret_access_key": "NEW-SECRET",
+                          "bucket": "new-bucket"
+                        }}
+                        """)));
+
+        var dest = client.getS3Credentials(MANAGER_ID, "inst-guid", "my-s3");
+
+        assertThat(dest.getAuthKey()).isEqualTo("NEW-AKID");
+        assertThat(dest.getAuthSecret()).isEqualTo("NEW-SECRET");
+        assertThat(dest.getBucket()).isEqualTo("new-bucket");
+
+        verify(postRequestedFor(urlPathEqualTo("/v3/service_credential_bindings"))
+                .withRequestBody(matchingJsonPath("$.name",
+                        equalTo("backup-monitor-my-s3-key")))
+                .withRequestBody(matchingJsonPath("$.type", equalTo("key"))));
+    }
+
+    @Test
+    void getS3Credentials_minioStyleFields_mappedCorrectly() {
+        stubFor(get(urlPathEqualTo("/v3/service_credential_bindings"))
+                .withQueryParam("type", equalTo("key"))
+                .willReturn(okJson("""
+                        {"resources": [{"guid": "key-minio"}]}
+                        """)));
+
+        stubFor(get(urlPathEqualTo("/v3/service_credential_bindings/key-minio/details"))
+                .willReturn(okJson("""
+                        {"credentials": {
+                          "access_key":  "MINIO-KEY",
+                          "secret_key":  "MINIO-SECRET",
+                          "bucket":      "minio-bucket",
+                          "host":        "http://minio.internal:9000"
+                        }}
+                        """)));
+
+        var dest = client.getS3Credentials(MANAGER_ID, "inst-guid", "minio-svc");
+
+        assertThat(dest.getAuthKey()).isEqualTo("MINIO-KEY");
+        assertThat(dest.getAuthSecret()).isEqualTo("MINIO-SECRET");
+        assertThat(dest.getEndpoint()).isEqualTo("http://minio.internal:9000");
+    }
+
     // ── createServiceKey ──────────────────────────────────────────────────────
 
     @Test

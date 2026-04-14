@@ -7,6 +7,7 @@ import de.example.backupmonitor.config.MonitoringConfig;
 import de.example.backupmonitor.model.BackupJob;
 import de.example.backupmonitor.model.BackupPlan;
 import de.example.backupmonitor.model.JobStatus;
+import de.example.backupmonitor.model.S3FileDestination;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -145,6 +146,75 @@ class BackupManagerClientTest {
         assertThat(client.getJobById(MANAGER_ID, "missing-job")).isEmpty();
     }
 
+    // ── createBackupPlan ───────────────────────────────────────────────────────
+
+    @Test
+    void createBackupPlan_success_returnsCreatedPlan() {
+        stubFor(post(urlPathEqualTo("/backupPlans"))
+                .willReturn(okJson("""
+                        {"id":"plan-new","paused":false,"active":true}
+                        """)));
+
+        Optional<BackupPlan> result = client.createBackupPlan(
+                MANAGER_ID, INSTANCE_ID, "0 2 * * *", buildS3Destination());
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getIdAsString()).isEqualTo("plan-new");
+        assertThat(result.get().isPaused()).isFalse();
+    }
+
+    @Test
+    void createBackupPlan_serverError_returnsEmpty() {
+        stubFor(post(urlPathEqualTo("/backupPlans"))
+                .willReturn(serverError()));
+
+        assertThat(client.createBackupPlan(
+                MANAGER_ID, INSTANCE_ID, "0 2 * * *", buildS3Destination())).isEmpty();
+    }
+
+    @Test
+    void createBackupPlan_sendsCorrectPayload() {
+        stubFor(post(urlPathEqualTo("/backupPlans"))
+                .willReturn(okJson("""
+                        {"id":"plan-new","paused":false}
+                        """)));
+
+        S3FileDestination dest = buildS3Destination();
+        client.createBackupPlan(MANAGER_ID, INSTANCE_ID, "0 2 * * *", dest);
+
+        verify(postRequestedFor(urlPathEqualTo("/backupPlans"))
+                .withHeader("Authorization", equalTo("Bearer test-bearer-token"))
+                .withHeader("Content-Type", containing("application/json"))
+                .withRequestBody(matchingJsonPath("$.instance_id", equalTo(INSTANCE_ID)))
+                .withRequestBody(matchingJsonPath("$.schedule", equalTo("0 2 * * *")))
+                .withRequestBody(matchingJsonPath("$.destination.type", equalTo("S3")))
+                .withRequestBody(matchingJsonPath("$.destination.bucket", equalTo("my-backups")))
+                .withRequestBody(matchingJsonPath("$.destination.auth_key", equalTo("AKID")))
+                .withRequestBody(matchingJsonPath("$.destination.auth_secret", equalTo("SECRET")))
+                .withRequestBody(matchingJsonPath("$.destination.region", equalTo("eu-central-1")))
+                .withRequestBody(matchingJsonPath("$.destination.endpoint",
+                        equalTo("https://minio.example.com"))));
+    }
+
+    @Test
+    void createBackupPlan_destinationWithoutOptionalFields_omitsNulls() {
+        stubFor(post(urlPathEqualTo("/backupPlans"))
+                .willReturn(okJson("""
+                        {"id":"plan-min","paused":false}
+                        """)));
+
+        S3FileDestination minimal = new S3FileDestination();
+        minimal.setAuthKey("K");
+        minimal.setAuthSecret("S");
+        minimal.setBucket("b");
+
+        client.createBackupPlan(MANAGER_ID, INSTANCE_ID, "0 2 * * *", minimal);
+
+        verify(postRequestedFor(urlPathEqualTo("/backupPlans"))
+                .withRequestBody(matchingJsonPath("$.destination.type", equalTo("S3")))
+                .withRequestBody(matchingJsonPath("$.destination.bucket", equalTo("b"))));
+    }
+
     // ── Auth ───────────────────────────────────────────────────────────────────
 
     @Test
@@ -158,5 +228,17 @@ class BackupManagerClientTest {
 
         verify(getRequestedFor(urlPathEqualTo("/backupPlans/byInstance/" + INSTANCE_ID))
                 .withHeader("Authorization", equalTo("Bearer test-bearer-token")));
+    }
+
+    // ── helpers ────────────────────────────────────────────────────────────────
+
+    private S3FileDestination buildS3Destination() {
+        S3FileDestination dest = new S3FileDestination();
+        dest.setAuthKey("AKID");
+        dest.setAuthSecret("SECRET");
+        dest.setBucket("my-backups");
+        dest.setRegion("eu-central-1");
+        dest.setEndpoint("https://minio.example.com");
+        return dest;
     }
 }
