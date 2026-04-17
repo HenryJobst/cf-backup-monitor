@@ -45,9 +45,10 @@ public class BackupPlanProvisioner {
             return Optional.empty();
         }
 
-        CfApiClient.S3ServiceCandidate s3 = findS3Service(managerId, manager, spaceGuid, ap, instanceId)
-                .orElse(null);
-        if (s3 == null) return Optional.empty();
+        Optional<CfApiClient.S3ServiceCandidate> s3Opt =
+                findS3Service(managerId, manager, spaceGuid, ap, instanceId);
+        if (s3Opt.isEmpty()) return Optional.empty();
+        CfApiClient.S3ServiceCandidate s3 = s3Opt.get();
 
         try {
             S3FileDestination destination = cfApiClient.getS3Credentials(
