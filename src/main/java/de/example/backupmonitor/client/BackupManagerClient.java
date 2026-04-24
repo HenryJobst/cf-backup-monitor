@@ -12,6 +12,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -88,10 +89,14 @@ public class BackupManagerClient {
      * Erstellt zunächst eine FileDestination (oder verwendet eine vorhandene),
      * da POST /backupPlans ein bereits in MongoDB persistiertes Objekt mit ID erwartet.
      *
-     * @param schedule Cron-Ausdruck (5-stellig, z.B. "0 2 * * *" für täglich 02:00)
+     * @param schedule         Cron-Ausdruck (5-stellig, z.B. "0 2 * * *" für täglich 02:00)
+     * @param retentionStyle   ALL, DAYS, FILES oder HOURS
+     * @param retentionPeriod  Anzahl aufzubewahrender Einheiten (muss &gt; 0 sein)
      */
     public Optional<BackupPlan> createBackupPlan(String managerId, String instanceId,
                                                    String schedule,
+                                                   String retentionStyle,
+                                                   int retentionPeriod,
                                                    S3FileDestination s3) {
         FileDestination fileDest = getOrCreateFileDestination(managerId, instanceId, s3).orElse(null);
         if (fileDest == null) {
@@ -103,12 +108,15 @@ public class BackupManagerClient {
             ManagerEndpoint ep = endpoints.get(managerId);
 
             Map<String, Object> destBody = buildDestinationPayload(s3);
+            destBody.put("id", fileDest.idAsString());
             destBody.put("idAsString", fileDest.idAsString());
             destBody.put("serviceInstance", Map.of("service_instance_id", instanceId));
 
             Map<String, Object> body = new HashMap<>();
             body.put("serviceInstance", Map.of("service_instance_id", instanceId));
             body.put("frequency", toQuartzCron(schedule));
+            body.put("retentionStyle", retentionStyle);
+            body.put("retentionPeriod", retentionPeriod);
             body.put("fileDestination", destBody);
 
             BackupPlan plan = ep.restClient.post()
@@ -119,6 +127,10 @@ public class BackupManagerClient {
                     .body(BackupPlan.class);
             log.info("Created backup plan for instance {} (schedule: {})", instanceId, schedule);
             return Optional.ofNullable(plan);
+        } catch (RestClientResponseException e) {
+            log.warn("Failed to create backup plan for instance {}: {} — body: {}",
+                    instanceId, e.getMessage(), e.getResponseBodyAsString());
+            return Optional.empty();
         } catch (Exception e) {
             log.warn("Failed to create backup plan for instance {}: {}", instanceId, e.getMessage());
             return Optional.empty();
@@ -192,6 +204,10 @@ public class BackupManagerClient {
                     .body(FileDestination.class);
             log.info("Created file destination for instance {}", instanceId);
             return Optional.ofNullable(dest);
+        } catch (RestClientResponseException e) {
+            log.warn("Failed to create file destination for instance {}: {} — body: {}",
+                    instanceId, e.getMessage(), e.getResponseBodyAsString());
+            return Optional.empty();
         } catch (Exception e) {
             log.warn("Failed to create file destination for instance {}: {}", instanceId, e.getMessage());
             return Optional.empty();

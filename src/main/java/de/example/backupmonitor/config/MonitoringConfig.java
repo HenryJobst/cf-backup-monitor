@@ -39,6 +39,10 @@ public class MonitoringConfig {
         private String s3ServiceLabel = "s3";
         /** Backup-Schedule im Cron-Format (5-stellig ohne Sekunden). */
         private String backupSchedule = "0 2 * * *";
+        /** Aufbewahrungsstrategie: ALL, DAYS, FILES oder HOURS. */
+        private String retentionStyle = "FILES";
+        /** Anzahl aufzubewahrender Einheiten (muss > 0 sein). */
+        private int retentionPeriod = 7;
     }
 
     @Data
