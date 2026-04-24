@@ -85,23 +85,34 @@ public class BackupManagerClient {
 
     /**
      * Legt einen neuen Backup-Plan für eine Service-Instanz an.
+     * Erstellt zunächst eine FileDestination (oder verwendet eine vorhandene),
+     * da POST /backupPlans ein bereits in MongoDB persistiertes Objekt mit ID erwartet.
      *
      * @param schedule Cron-Ausdruck (5-stellig, z.B. "0 2 * * *" für täglich 02:00)
      */
     public Optional<BackupPlan> createBackupPlan(String managerId, String instanceId,
                                                    String schedule,
-                                                   S3FileDestination destination) {
+                                                   S3FileDestination s3) {
+        FileDestination fileDest = getOrCreateFileDestination(managerId, instanceId, s3).orElse(null);
+        if (fileDest == null) {
+            log.warn("Could not obtain file destination for instance {}, skipping plan creation", instanceId);
+            return Optional.empty();
+        }
+
         try {
             ManagerEndpoint ep = endpoints.get(managerId);
-            String url = ep.url + "/backupPlans";
+
+            Map<String, Object> destBody = buildDestinationPayload(s3);
+            destBody.put("idAsString", fileDest.idAsString());
+            destBody.put("serviceInstance", Map.of("service_instance_id", instanceId));
 
             Map<String, Object> body = new HashMap<>();
-            body.put("instance_id", instanceId);
-            body.put("schedule", schedule);
-            body.put("destination", buildDestinationPayload(destination));
+            body.put("serviceInstance", Map.of("service_instance_id", instanceId));
+            body.put("frequency", toQuartzCron(schedule));
+            body.put("fileDestination", destBody);
 
             BackupPlan plan = ep.restClient.post()
-                    .uri(url)
+                    .uri(ep.url + "/backupPlans")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
@@ -117,12 +128,74 @@ public class BackupManagerClient {
     private Map<String, Object> buildDestinationPayload(S3FileDestination s3) {
         Map<String, Object> dest = new HashMap<>();
         dest.put("type", "S3");
+        dest.put("authKey", s3.getAuthKey());
+        dest.put("authSecret", s3.getAuthSecret());
         dest.put("bucket", s3.getBucket());
         if (s3.getEndpoint() != null) dest.put("endpoint", s3.getEndpoint());
         if (s3.getRegion() != null) dest.put("region", s3.getRegion());
-        dest.put("auth_key", s3.getAuthKey());
-        dest.put("auth_secret", s3.getAuthSecret());
         return dest;
+    }
+
+    /** Wandelt einen 5-Felder-Standard-Cron ("0 2 * * *") in Quartz-Format um ("0 0 2 * * *"). */
+    private String toQuartzCron(String schedule) {
+        if (schedule == null) return schedule;
+        String[] parts = schedule.trim().split("\\s+");
+        return parts.length == 5 ? "0 " + schedule : schedule;
+    }
+
+    /**
+     * Gibt eine vorhandene FileDestination für die Instanz zurück oder legt eine neue an.
+     * Notwendig, da POST /backupPlans ein bereits in MongoDB gespeichertes FileDestination-Objekt (mit ID) erwartet.
+     */
+    private Optional<FileDestination> getOrCreateFileDestination(String managerId,
+                                                                   String instanceId,
+                                                                   S3FileDestination s3) {
+        Optional<FileDestination> existing = getFileDestinationByInstance(managerId, instanceId);
+        if (existing.isPresent()) return existing;
+        return createFileDestination(managerId, instanceId, s3);
+    }
+
+    private Optional<FileDestination> getFileDestinationByInstance(String managerId, String instanceId) {
+        try {
+            ManagerEndpoint ep = endpoints.get(managerId);
+            String url = ep.url + "/fileDestinations/byInstance/" + instanceId + "?size=1";
+            PageContent<FileDestination> page = ep.restClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (page == null || page.getContent().isEmpty()) return Optional.empty();
+            return Optional.of(page.getContent().get(0));
+        } catch (Exception e) {
+            log.warn("Failed to get file destination for instance {}: {}", instanceId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private Optional<FileDestination> createFileDestination(String managerId, String instanceId,
+                                                             S3FileDestination s3) {
+        try {
+            ManagerEndpoint ep = endpoints.get(managerId);
+            Map<String, Object> body = new HashMap<>();
+            body.put("type", "S3");
+            body.put("serviceInstance", Map.of("service_instance_id", instanceId));
+            body.put("authKey", s3.getAuthKey());
+            body.put("authSecret", s3.getAuthSecret());
+            body.put("bucket", s3.getBucket());
+            if (s3.getEndpoint() != null) body.put("endpoint", s3.getEndpoint());
+            if (s3.getRegion() != null) body.put("region", s3.getRegion());
+
+            FileDestination dest = ep.restClient.post()
+                    .uri(ep.url + "/fileDestinations")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(FileDestination.class);
+            log.info("Created file destination for instance {}", instanceId);
+            return Optional.ofNullable(dest);
+        } catch (Exception e) {
+            log.warn("Failed to create file destination for instance {}: {}", instanceId, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     public Optional<BackupJob> getJobById(String managerId, String jobId) {
@@ -139,6 +212,11 @@ public class BackupManagerClient {
             return Optional.empty();
         }
     }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record FileDestination(String idAsString, String type,
+                           String authKey, String authSecret,
+                           String bucket, String endpoint, String region) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class PageContent<T> {

@@ -215,6 +215,7 @@ public class CfApiClient {
         Map<String, Object> creds = (Map<String, Object>) detail.get("credentials");
         if (creds == null) throw new RuntimeException("No credentials in service key " + keyGuid);
 
+        log.debug("S3 credential keys for {}: {}", instanceName, creds.keySet());
         return buildS3Destination(creds);
     }
 
@@ -224,8 +225,8 @@ public class CfApiClient {
      */
     private S3FileDestination buildS3Destination(Map<String, Object> creds) {
         S3FileDestination dest = new S3FileDestination();
-        dest.setAuthKey(firstPresent(creds, "access_key_id", "access_key", "accessKeyId"));
-        dest.setAuthSecret(firstPresent(creds, "secret_access_key", "secret_key", "secretAccessKey"));
+        dest.setAuthKey(firstPresent(creds, "access_key_id", "access_key", "accessKeyId", "accessKey", "auth_key"));
+        dest.setAuthSecret(firstPresent(creds, "secret_access_key", "secret_key", "secretAccessKey", "secretKey", "auth_secret"));
         dest.setBucket(firstPresent(creds, "bucket", "default_bucket", "bucketName"));
         dest.setEndpoint(firstPresent(creds, "endpoint", "host", "uri", "url"));
         dest.setRegion(firstPresent(creds, "region", "aws_region", "location"));
