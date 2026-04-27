@@ -21,6 +21,9 @@ import java.time.Instant;
 public class S3VerificationService {
 
     private static final byte[] GZIP_MAGIC = {0x1F, (byte) 0x8B};
+    private static final byte[] TAR_USTAR  = {'u', 's', 't', 'a', 'r'};
+    private static final int    TAR_USTAR_OFFSET = 257;
+    private static final int    TAR_MIN_BYTES    = TAR_USTAR_OFFSET + TAR_USTAR.length;
 
     private final S3ClientFactory clientFactory;
     private final S3CheckResultRepository repository;
@@ -83,7 +86,8 @@ public class S3VerificationService {
             }
 
             // ── c) ACCESSIBLE ────────────────────────────────────────────
-            byte[] firstBytes = downloadPartial(s3, dest.getBucket(), filename, accessibilityBytes);
+            int bytesToFetch = Math.max(accessibilityBytes, TAR_MIN_BYTES);
+            byte[] firstBytes = downloadPartial(s3, dest.getBucket(), filename, bytesToFetch);
             result.setAccessible(firstBytes != null && firstBytes.length > 0);
 
             if (!result.isAccessible()) {
@@ -93,10 +97,9 @@ public class S3VerificationService {
 
             // ── d) INTEGRITY (Magic Bytes) ───────────────────────────────
             if (firstBytes.length >= 2) {
-                boolean gzipValid = firstBytes[0] == GZIP_MAGIC[0]
-                        && firstBytes[1] == GZIP_MAGIC[1];
-                result.setMagicBytesValid(gzipValid);
-                if (!gzipValid) {
+                boolean valid = isGzip(firstBytes) || isTar(firstBytes);
+                result.setMagicBytesValid(valid);
+                if (!valid) {
                     log.warn("S3 file has unexpected magic bytes: {} {}",
                             String.format("0x%02X", firstBytes[0]),
                             String.format("0x%02X", firstBytes[1]));
@@ -113,6 +116,20 @@ public class S3VerificationService {
         }
 
         return finalize(result, managerId, instanceId, instanceName);
+    }
+
+    private boolean isGzip(byte[] bytes) {
+        return bytes.length >= 2
+                && bytes[0] == GZIP_MAGIC[0]
+                && bytes[1] == GZIP_MAGIC[1];
+    }
+
+    private boolean isTar(byte[] bytes) {
+        if (bytes.length < TAR_MIN_BYTES) return false;
+        for (int i = 0; i < TAR_USTAR.length; i++) {
+            if (bytes[TAR_USTAR_OFFSET + i] != TAR_USTAR[i]) return false;
+        }
+        return true;
     }
 
     private HeadObjectResponse checkExists(S3Client s3, String bucket, String key) {
