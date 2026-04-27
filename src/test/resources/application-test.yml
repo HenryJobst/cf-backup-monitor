@@ -27,7 +27,6 @@ cf-backup-monitor:
 
   s3-verification:
     enabled: true
-    size-tolerance-percent: 10
     accessibility-check-bytes: 16
 
   restore-test:

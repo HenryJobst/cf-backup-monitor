@@ -11,3 +11,5 @@ databaseChangeLog:
       file: db/changelog/changes/005-create-shedlock.yaml
   - include:
       file: db/changelog/changes/006-create-s3-check-result.yaml
+  - include:
+      file: db/changelog/changes/007-s3-check-result-rename-size-match.yaml

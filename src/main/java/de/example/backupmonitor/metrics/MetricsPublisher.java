@@ -107,16 +107,13 @@ public class MetricsPublisher {
                 .set(result.isExists() ? 1.0 : 0.0);
         getOrRegisterGauge(MetricNames.S3_SIZE_MATCH, tags,
                 "1 = file size within configured tolerance")
-                .set(result.isSizeMatchWithinTolerance() ? 1.0 : 0.0);
+                .set(result.isSizeMatch() ? 1.0 : 0.0);
         getOrRegisterGauge(MetricNames.S3_ACCESSIBLE, tags,
                 "1 = file bytes downloadable via range request")
                 .set(result.isAccessible() ? 1.0 : 0.0);
         getOrRegisterGauge(MetricNames.S3_MAGIC_BYTES_VALID, tags,
                 "1 = file starts with valid gzip magic bytes")
                 .set(result.isMagicBytesValid() ? 1.0 : 0.0);
-        getOrRegisterGauge(MetricNames.S3_SIZE_DEVIATION_PCT, tags,
-                "Deviation between reported and actual file size in percent")
-                .set(result.getSizeDeviationPercent());
         getOrRegisterGauge(MetricNames.S3_ALL_CHECKS_PASSED, tags,
                 "1 = all S3 checks passed (exists, size, accessible, magic bytes)")
                 .set(result.isAllPassed() ? 1.0 : 0.0);

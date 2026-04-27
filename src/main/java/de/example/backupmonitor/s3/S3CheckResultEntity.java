@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
@@ -41,11 +40,8 @@ public class S3CheckResultEntity {
     @Column(name = "size_actual_bytes")
     private Long sizeActualBytes;
 
-    @Column(name = "size_match_within_tolerance")
-    private boolean sizeMatchWithinTolerance;
-
-    @Column(name = "size_deviation_percent", precision = 6, scale = 2)
-    private BigDecimal sizeDeviationPercent;
+    @Column(name = "size_match")
+    private boolean sizeMatch;
 
     @Column(name = "accessible")
     private boolean accessible;
@@ -72,9 +68,7 @@ public class S3CheckResultEntity {
         entity.setExists(result.isExists());
         entity.setSizeExpectedBytes(result.getSizeExpectedBytes());
         entity.setSizeActualBytes(result.getSizeActualBytes());
-        entity.setSizeMatchWithinTolerance(result.isSizeMatchWithinTolerance());
-        entity.setSizeDeviationPercent(BigDecimal.valueOf(result.getSizeDeviationPercent())
-                .setScale(2, java.math.RoundingMode.HALF_UP));
+        entity.setSizeMatch(result.isSizeMatch());
         entity.setAccessible(result.isAccessible());
         entity.setMagicBytesValid(result.isMagicBytesValid());
         entity.setAllPassed(result.isAllPassed());

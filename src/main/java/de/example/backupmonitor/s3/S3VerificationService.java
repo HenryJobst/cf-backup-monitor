@@ -29,9 +29,6 @@ public class S3VerificationService {
     private final S3CheckResultRepository repository;
     private final MetricsPublisher metrics;
 
-    @Value("${cf-backup-monitor.s3-verification.size-tolerance-percent:5}")
-    private int sizeTolerance;
-
     @Value("${cf-backup-monitor.s3-verification.accessibility-check-bytes:1024}")
     private int accessibilityBytes;
 
@@ -76,13 +73,9 @@ public class S3VerificationService {
             result.setSizeExpectedBytes(reportedSize);
 
             if (reportedSize > 0) {
-                double deviation = Math.abs(s3Size - reportedSize)
-                        / (double) reportedSize * 100.0;
-                result.setSizeMatchWithinTolerance(deviation <= sizeTolerance);
-                result.setSizeDeviationPercent(deviation);
+                result.setSizeMatch(s3Size == reportedSize);
             } else {
-                result.setSizeMatchWithinTolerance(s3Size > 0);
-                result.setSizeDeviationPercent(0.0);
+                result.setSizeMatch(s3Size > 0);
             }
 
             // ── c) ACCESSIBLE ────────────────────────────────────────────
@@ -194,7 +187,7 @@ public class S3VerificationService {
                                     String instanceId, String instanceName) {
         result.setAllPassed(
                 result.isExists()
-                        && result.isSizeMatchWithinTolerance()
+                        && result.isSizeMatch()
                         && result.isAccessible()
                         && result.isMagicBytesValid());
 
@@ -204,7 +197,7 @@ public class S3VerificationService {
         log.info("S3 verification for instance {}: allPassed={}, exists={}, accessible={}, "
                         + "sizeMatch={}, magicBytes={}",
                 instanceId, result.isAllPassed(), result.isExists(),
-                result.isAccessible(), result.isSizeMatchWithinTolerance(),
+                result.isAccessible(), result.isSizeMatch(),
                 result.isMagicBytesValid());
 
         return result;

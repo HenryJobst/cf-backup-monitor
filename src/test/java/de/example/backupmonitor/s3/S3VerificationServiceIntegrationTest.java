@@ -62,7 +62,6 @@ class S3VerificationServiceIntegrationTest {
 
         clientFactory = new S3ClientFactory();
         service = new S3VerificationService(clientFactory, repository, metricsPublisher);
-        injectField(service, "sizeTolerance", 10);
         injectField(service, "accessibilityBytes", 16);
 
         adminClient = S3Client.builder()
@@ -108,7 +107,7 @@ class S3VerificationServiceIntegrationTest {
         assertThat(result.isExists()).isTrue();
         assertThat(result.isAccessible()).isTrue();
         assertThat(result.isMagicBytesValid()).isTrue();
-        assertThat(result.isSizeMatchWithinTolerance()).isTrue();
+        assertThat(result.isSizeMatch()).isTrue();
         assertThat(result.isAllPassed()).isTrue();
         assertThat(result.isS3Verified()).isTrue();
 
@@ -159,15 +158,14 @@ class S3VerificationServiceIntegrationTest {
                 PutObjectRequest.builder().bucket(BUCKET).key(FILE_KEY).build(),
                 RequestBody.fromBytes(content));
 
-        // Berichtete Größe weicht stark ab (50% > 10% Toleranz)
+        // Berichtete Größe (2048) weicht von tatsächlicher S3-Größe (1024) ab
         BackupJob job = buildJob(2048);
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         S3CheckResult result = service.verify("mgr-1", "inst-1", "pg-test", job);
 
         assertThat(result.isExists()).isTrue();
-        assertThat(result.isSizeMatchWithinTolerance()).isFalse();
-        assertThat(result.getSizeDeviationPercent()).isGreaterThan(10.0);
+        assertThat(result.isSizeMatch()).isFalse();
     }
 
     private BackupJob buildJob(long filesize) {

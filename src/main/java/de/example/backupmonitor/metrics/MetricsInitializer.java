@@ -62,9 +62,7 @@ public class MetricsInitializer {
                 .exists(e.isExists())
                 .sizeExpectedBytes(e.getSizeExpectedBytes() != null ? e.getSizeExpectedBytes() : 0L)
                 .sizeActualBytes(e.getSizeActualBytes() != null ? e.getSizeActualBytes() : 0L)
-                .sizeMatchWithinTolerance(e.isSizeMatchWithinTolerance())
-                .sizeDeviationPercent(e.getSizeDeviationPercent() != null
-                        ? e.getSizeDeviationPercent().doubleValue() : 0.0)
+                .sizeMatch(e.isSizeMatch())
                 .accessible(e.isAccessible())
                 .magicBytesValid(e.isMagicBytesValid())
                 .allPassed(e.isAllPassed())

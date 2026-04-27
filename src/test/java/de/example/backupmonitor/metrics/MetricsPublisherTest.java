@@ -141,8 +141,8 @@ class MetricsPublisherTest {
         S3CheckResult result = S3CheckResult.builder()
                 .managerId("mgr").instanceId("inst")
                 .exists(true).accessible(true)
-                .sizeMatchWithinTolerance(true).magicBytesValid(true)
-                .sizeDeviationPercent(2.0).sizeActualBytes(1024L)
+                .sizeMatch(true).magicBytesValid(true)
+                .sizeActualBytes(1024L)
                 .allPassed(true)
                 .build();
 

@@ -68,7 +68,6 @@ public class MonitoringConfig {
     @Data
     public static class S3VerificationProperties {
         private boolean enabled = true;
-        private int sizeTolerancePercent = 5;
         private int accessibilityCheckBytes = 1024;
     }
 

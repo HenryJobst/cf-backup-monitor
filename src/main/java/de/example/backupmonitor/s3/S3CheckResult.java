@@ -22,8 +22,7 @@ public class S3CheckResult {
     // b) SIZE
     private long sizeExpectedBytes;
     private long sizeActualBytes;
-    private boolean sizeMatchWithinTolerance;
-    private double sizeDeviationPercent;
+    private boolean sizeMatch;
 
     // c) ACCESSIBLE
     private boolean accessible;
@@ -36,6 +35,6 @@ public class S3CheckResult {
     private String error;
 
     public boolean isS3Verified() {
-        return exists && accessible && sizeMatchWithinTolerance;
+        return exists && accessible && sizeMatch;
     }
 }

@@ -157,7 +157,7 @@ class S3CheckResultRepositoryTest {
         e.setAllPassed(allPassed);
         e.setExists(allPassed);
         e.setAccessible(allPassed);
-        e.setSizeMatchWithinTolerance(allPassed);
+        e.setSizeMatch(allPassed);
         e.setMagicBytesValid(allPassed);
         e.setCheckedAt(checkedAt);
         repository.save(e);

@@ -65,7 +65,6 @@ cf-backup-monitor:
 
   s3-verification:
     enabled:                   ${S3_VERIFY_ENABLED:true}
-    size-tolerance-percent:    ${S3_SIZE_TOLERANCE:5}
     accessibility-check-bytes: ${S3_ACCESSIBILITY_BYTES:1024}
 
   retention:
