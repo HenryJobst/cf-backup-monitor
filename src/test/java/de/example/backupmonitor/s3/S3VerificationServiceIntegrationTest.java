@@ -188,7 +188,7 @@ class S3VerificationServiceIntegrationTest {
 
         AgentExecutionResponse agentResp = new AgentExecutionResponse();
         agentResp.setFilename(FILE_KEY);
-        agentResp.setFilesizeBytes(filesize);
+        agentResp.setFilesize(new AgentExecutionResponse.FilesizeInfo(filesize, "byte"));
         job.setAgentExecutionReponses(Map.of("agent-1", agentResp));
 
         return job;
