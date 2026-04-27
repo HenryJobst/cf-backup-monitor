@@ -10,11 +10,11 @@
 
 The Backup Monitor is a Spring Boot 4 / Java 21 service that continuously verifies the health of PostgreSQL backups managed by an OSB (Open Service Broker) backup manager. It covers three independent verification layers:
 
-1. **Job Check** – Verifies that the latest backup job for each configured service instance completed successfully.
-2. **S3 Verification** – Checks that the backup file exists in the configured S3-compatible object store, is accessible, has a plausible file size, and starts with valid gzip magic bytes.
+1. **Job Check** – Verifies that the latest backup job for each configured service instance completed successfully. Tracks consecutive failures, detects overdue backups based on the plan's cron schedule, and flags plans that have never produced a successful job.
+2. **S3 Verification** – Checks that the backup file exists in the configured S3-compatible object store, that the bucket is reachable, that the file is accessible, that the reported size matches the actual size exactly, that the file has valid archive magic bytes (gzip or uncompressed tar), and monitors file size and duration trends across runs. Also compares the number of stored backup files against the expected count derived from the plan's retention settings.
 3. **Restore Test** – Triggers a full restore of a recent backup into a sandbox database and runs configurable SQL validation queries against the restored data.
 
-All results are persisted to PostgreSQL and exposed as Prometheus metrics. Distributed locking via ShedLock prevents duplicate executions in multi-instance deployments.
+All results are persisted to PostgreSQL and exposed as Prometheus metrics. Metrics are restored from the database on startup so no state is lost after a restart. Distributed locking via ShedLock prevents duplicate executions in multi-instance deployments.
 
 ---
 
@@ -28,20 +28,21 @@ All results are persisted to PostgreSQL and exposed as Prometheus metrics. Distr
              │                         │
              ▼                         ▼
    MonitoringOrchestrator        RestoreTestMonitor
-   ┌──────────────────┐          ┌──────────────────────────┐
-   │ BackupPlanMonitor│          │ SandboxManager           │
-   │ BackupJobMonitor │          │ SandboxProvisioner (CF)  │
-   │ S3Verification   │          │ AgentClient (restore)    │
-   │ MetricsPublisher │          │ DatabaseContentChecker   │
-   │ MonitorRunRepo   │          │ MetricsPublisher         │
-   └──────────────────┘          └──────────────────────────┘
-             │                         │
-             └──────────┬──────────────┘
-                        ▼
-                   PostgreSQL
-              (monitor_run, s3_check_result,
-               restore_test_result, sandbox_registry,
-               stored_token, shedlock)
+   ┌────────────────────────┐    ┌──────────────────────────┐
+   │ BackupPlanMonitor      │    │ SandboxManager           │
+   │ BackupJobMonitor       │    │ SandboxProvisioner (CF)  │
+   │ ConsecutiveFailuresSvc │    │ AgentClient (restore)    │
+   │ S3VerificationService  │    │ DatabaseContentChecker   │
+   │ MetricsPublisher       │    │ MetricsPublisher         │
+   │ MonitorRunRepository   │    └──────────────────────────┘
+   └────────────────────────┘
+             │
+             ▼
+        PostgreSQL
+   (monitor_run, s3_check_result,
+    instance_job_state,
+    restore_test_result, sandbox_registry,
+    stored_token, shedlock)
 ```
 
 ---
@@ -138,8 +139,15 @@ Prerequisites: `cf.space-guid` must be set per manager. If `instances[].s3-insta
 | Property | Env variable | Default | Description |
 |---|---|---|---|
 | `cf-backup-monitor.s3-verification.enabled` | `S3_VERIFY_ENABLED` | `true` | Enable/disable S3 file verification |
-| `cf-backup-monitor.s3-verification.size-tolerance-percent` | `S3_SIZE_TOLERANCE` | `5` | Allowed deviation (%) between reported and actual S3 file size |
-| `cf-backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Number of bytes to download for the accessibility check |
+| `cf-backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Number of bytes to download for the accessibility and magic-bytes check |
+| `cf-backup-monitor.s3-verification.shrink-warning-threshold-percent` | `S3_SHRINK_THRESHOLD` | `20` | Warn if the backup file shrank by more than this percentage compared to the previous run |
+| `cf-backup-monitor.s3-verification.growth-warning-threshold-percent` | `S3_GROWTH_THRESHOLD` | `50` | Warn if the backup file grew by more than this percentage compared to the previous run |
+| `cf-backup-monitor.s3-verification.duration-growth-threshold-percent` | `S3_DURATION_GROWTH_THRESHOLD` | `50` | Warn if backup execution time grew by more than this percentage compared to the previous run |
+| `cf-backup-monitor.s3-verification.overdue-tolerance-percent` | `S3_OVERDUE_TOLERANCE_PCT` | `25` | Grace period after the next scheduled backup fire before the job is considered overdue (as a percentage of the cron interval) |
+
+Size and duration trend comparisons are only performed when the compression setting of the backup plan has not changed between runs, to avoid false positives after a configuration change.
+
+The overdue check uses the backup plan's 6-field Quartz cron expression. It computes the next expected fire time after the last successful job's end date, then adds the tolerance as a grace period. If now is past that deadline and no newer job has run, `backup_job_overdue` is set to `1`. Returns `-1` if no job has run yet or if the cron cannot be parsed.
 
 #### Restore Test
 
@@ -215,6 +223,7 @@ All metrics carry the labels `manager_id`, `instance_id`, and `instance_name` un
 |---|---|---|
 | `backup_plan_active` | Gauge | `1` = plan exists and is not paused, `0` = missing or paused |
 | `backup_plan_paused` | Gauge | `1` = plan is currently paused |
+| `backup_plan_has_succeeded_job` | Gauge | `1` = the plan has produced at least one SUCCEEDED job ever, `0` = never succeeded |
 
 **Backup Job**
 
@@ -223,6 +232,9 @@ All metrics carry the labels `manager_id`, `instance_id`, and `instance_name` un
 | `backup_job_last_status` | Gauge | `1` = last job SUCCEEDED, `0` = otherwise |
 | `backup_job_last_age_hours` | Gauge | Age of the last backup in hours; `-1` = no job found |
 | `backup_job_last_filesize_bytes` | Gauge | Reported file size of the last backup in bytes |
+| `backup_job_last_duration_ms` | Gauge | Total execution time of the last backup job in milliseconds |
+| `backup_job_consecutive_failures` | Gauge | Number of consecutive failed checks since the last success; `0` = last check succeeded |
+| `backup_job_overdue` | Gauge | `1` = last backup is overdue based on the plan's cron schedule and tolerance; `0` = on time; `-1` = not determinable |
 | `backup_job_success_total` | Counter | Total number of successful job checks |
 | `backup_job_failure_total` | Counter | Total number of failed job checks |
 
@@ -230,13 +242,18 @@ All metrics carry the labels `manager_id`, `instance_id`, and `instance_name` un
 
 | Metric | Type | Description |
 |---|---|---|
+| `backup_s3_bucket_accessible` | Gauge | `1` = S3 bucket responds to a metadata request |
 | `backup_s3_file_exists` | Gauge | `1` = backup file found in S3 |
-| `backup_s3_size_match` | Gauge | `1` = file size within configured tolerance |
-| `backup_s3_accessible` | Gauge | `1` = file bytes downloadable via range request |
-| `backup_s3_magic_bytes_valid` | Gauge | `1` = file starts with valid gzip magic bytes (`1F 8B`) |
-| `backup_s3_size_deviation_percent` | Gauge | Deviation between reported and actual file size in percent |
-| `backup_s3_all_checks_passed` | Gauge | `1` = all four S3 checks passed |
+| `backup_s3_size_match` | Gauge | `1` = actual S3 file size matches the size reported by the backup agent exactly |
 | `backup_s3_file_size_bytes` | Gauge | Actual file size in S3 in bytes |
+| `backup_s3_size_shrink_warning` | Gauge | `1` = file is significantly smaller than the previous backup (threshold configurable) |
+| `backup_s3_size_growth_warning` | Gauge | `1` = file is significantly larger than the previous backup (threshold configurable) |
+| `backup_s3_accessible` | Gauge | `1` = file bytes downloadable via range request |
+| `backup_s3_magic_bytes_valid` | Gauge | `1` = file starts with valid archive signature: gzip (`1F 8B`) or uncompressed tar (ustar at offset 257) |
+| `backup_s3_duration_growth_warning` | Gauge | `1` = backup duration has grown significantly compared to the previous run |
+| `backup_s3_file_count` | Gauge | Number of backup files currently stored under the plan's S3 prefix |
+| `backup_s3_expected_file_count` | Gauge | Expected number of files based on the plan's retention settings (only emitted when determinable) |
+| `backup_s3_all_checks_passed` | Gauge | `1` = exists, size match, accessible, and magic bytes all passed |
 
 **Restore Test**
 
@@ -261,7 +278,8 @@ The schema is managed by Liquibase and created automatically. The following tabl
 | Table | Purpose |
 |---|---|
 | `monitor_run` | One row per job-check or restore-test execution; retention-pruned |
-| `s3_check_result` | Detailed S3 verification results; retention-pruned |
+| `s3_check_result` | Detailed S3 verification results including size, trend warnings, file count, and magic bytes; retention-pruned |
+| `instance_job_state` | Persistent per-instance state: consecutive failure counter and whether a successful job has ever been observed |
 | `restore_test_result` | Detailed restore test outcomes including per-query results (JSONB) |
 | `sandbox_registry` | Persistent registry of provisioned CF sandbox instances |
 | `stored_token` | Encrypted UAA access tokens per manager |
@@ -291,11 +309,11 @@ Tests use **Testcontainers** (PostgreSQL, MinIO) and **WireMock** – no externa
 
 Der Backup Monitor ist ein Spring Boot 4 / Java 21 Dienst, der kontinuierlich die Integrität von PostgreSQL-Backups prüft, die von einem OSB-Backup-Manager verwaltet werden. Er deckt drei unabhängige Verifikationsebenen ab:
 
-1. **Job-Prüfung** – Verifiziert, ob der letzte Backup-Job jeder konfigurierten Service-Instanz erfolgreich abgeschlossen wurde.
-2. **S3-Verifikation** – Prüft, ob die Backup-Datei im konfigurierten S3-kompatiblen Object Store vorhanden ist, abrufbar ist, eine plausible Dateigröße aufweist und mit gültigen gzip Magic Bytes beginnt.
+1. **Job-Prüfung** – Verifiziert, ob der letzte Backup-Job jeder konfigurierten Service-Instanz erfolgreich abgeschlossen wurde. Zählt aufeinanderfolgende Fehler, erkennt überfällige Backups anhand des Cron-Zeitplans des Plans und meldet Pläne, die noch nie einen erfolgreichen Job erzeugt haben.
+2. **S3-Verifikation** – Prüft, ob die Backup-Datei im konfigurierten S3-kompatiblen Object Store vorhanden und der Bucket erreichbar ist, ob die Datei abrufbar ist, ob die gemeldete Größe exakt mit der tatsächlichen übereinstimmt, ob die Datei mit einer gültigen Archiv-Signatur beginnt (gzip oder unkomprimiertes tar) und überwacht Größen- und Laufzeitentwicklungen über mehrere Läufe hinweg. Zusätzlich wird die Anzahl gespeicherter Backup-Dateien mit dem erwarteten Wert aus den Retention-Einstellungen verglichen.
 3. **Restore-Test** – Löst eine vollständige Wiederherstellung eines aktuellen Backups in eine Sandbox-Datenbank aus und führt konfigurierbare SQL-Validierungsabfragen gegen die wiederhergestellten Daten durch.
 
-Alle Ergebnisse werden in PostgreSQL gespeichert und als Prometheus-Metriken bereitgestellt. Verteiltes Sperren via ShedLock verhindert Doppelausführungen in Multi-Instanz-Deployments.
+Alle Ergebnisse werden in PostgreSQL gespeichert und als Prometheus-Metriken bereitgestellt. Beim Start werden die Metriken aus der Datenbank wiederhergestellt, sodass nach einem Neustart kein Zustand verloren geht. Verteiltes Sperren via ShedLock verhindert Doppelausführungen in Multi-Instanz-Deployments.
 
 ---
 
@@ -309,20 +327,21 @@ Alle Ergebnisse werden in PostgreSQL gespeichert und als Prometheus-Metriken ber
              │                         │
              ▼                         ▼
    MonitoringOrchestrator        RestoreTestMonitor
-   ┌──────────────────┐          ┌──────────────────────────┐
-   │ BackupPlanMonitor│          │ SandboxManager           │
-   │ BackupJobMonitor │          │ SandboxProvisioner (CF)  │
-   │ S3-Verifikation  │          │ AgentClient (Restore)    │
-   │ MetricsPublisher │          │ DatabaseContentChecker   │
-   │ MonitorRunRepo   │          │ MetricsPublisher         │
-   └──────────────────┘          └──────────────────────────┘
-             │                         │
-             └──────────┬──────────────┘
-                        ▼
-                   PostgreSQL
-              (monitor_run, s3_check_result,
-               restore_test_result, sandbox_registry,
-               stored_token, shedlock)
+   ┌────────────────────────┐    ┌──────────────────────────┐
+   │ BackupPlanMonitor      │    │ SandboxManager           │
+   │ BackupJobMonitor       │    │ SandboxProvisioner (CF)  │
+   │ ConsecutiveFailuresSvc │    │ AgentClient (Restore)    │
+   │ S3VerificationService  │    │ DatabaseContentChecker   │
+   │ MetricsPublisher       │    │ MetricsPublisher         │
+   │ MonitorRunRepository   │    └──────────────────────────┘
+   └────────────────────────┘
+             │
+             ▼
+        PostgreSQL
+   (monitor_run, s3_check_result,
+    instance_job_state,
+    restore_test_result, sandbox_registry,
+    stored_token, shedlock)
 ```
 
 ---
@@ -420,8 +439,15 @@ Ist `instances[].s3-instance-name` gesetzt, wird genau diese S3-Instanz gesucht 
 | Eigenschaft | Umgebungsvariable | Standard | Beschreibung |
 |---|---|---|---|
 | `cf-backup-monitor.s3-verification.enabled` | `S3_VERIFY_ENABLED` | `true` | S3-Dateiverifikation aktivieren/deaktivieren |
-| `cf-backup-monitor.s3-verification.size-tolerance-percent` | `S3_SIZE_TOLERANCE` | `5` | Erlaubte Abweichung (%) zwischen gemeldeter und tatsächlicher S3-Dateigröße |
-| `cf-backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Anzahl herunterzuladender Bytes für den Zugriffstest |
+| `cf-backup-monitor.s3-verification.accessibility-check-bytes` | `S3_ACCESSIBILITY_BYTES` | `1024` | Anzahl herunterzuladender Bytes für Zugriffstest und Magic-Bytes-Prüfung |
+| `cf-backup-monitor.s3-verification.shrink-warning-threshold-percent` | `S3_SHRINK_THRESHOLD` | `20` | Warnung, wenn die Backup-Datei um mehr als diesen Prozentwert gegenüber dem Vorgänger geschrumpft ist |
+| `cf-backup-monitor.s3-verification.growth-warning-threshold-percent` | `S3_GROWTH_THRESHOLD` | `50` | Warnung, wenn die Backup-Datei um mehr als diesen Prozentwert gegenüber dem Vorgänger gewachsen ist |
+| `cf-backup-monitor.s3-verification.duration-growth-threshold-percent` | `S3_DURATION_GROWTH_THRESHOLD` | `50` | Warnung, wenn die Ausführungszeit um mehr als diesen Prozentwert gegenüber dem Vorgänger gestiegen ist |
+| `cf-backup-monitor.s3-verification.overdue-tolerance-percent` | `S3_OVERDUE_TOLERANCE_PCT` | `25` | Kulanzzeit nach dem nächsten geplanten Backup-Feuerzeitpunkt, bevor ein Job als überfällig gilt (als Prozentsatz des Cron-Intervalls) |
+
+Größen- und Laufzeitvergleiche werden nur durchgeführt, wenn sich die Kompressionseinstellung des Backup-Plans zwischen den Läufen nicht verändert hat, um Fehlalarme nach Konfigurationsänderungen zu vermeiden.
+
+Die Überfälligkeitsprüfung verwendet den 6-stelligen Quartz-Cron-Ausdruck des Backup-Plans. Sie berechnet den nächsten erwarteten Feuerzeitpunkt nach dem Enddatum des letzten erfolgreichen Jobs und addiert die Toleranz als Kulanzzeit. Liegt der aktuelle Zeitpunkt nach dieser Deadline und kein neuerer Job wurde ausgeführt, wird `backup_job_overdue` auf `1` gesetzt. Gibt `-1` zurück, wenn noch kein Job gelaufen ist oder der Cron-Ausdruck nicht geparst werden kann.
 
 #### Restore-Test
 
@@ -497,6 +523,7 @@ Alle Metriken tragen die Labels `manager_id`, `instance_id` und `instance_name`,
 |---|---|---|
 | `backup_plan_active` | Gauge | `1` = Plan vorhanden und nicht pausiert, `0` = fehlt oder pausiert |
 | `backup_plan_paused` | Gauge | `1` = Plan ist aktuell pausiert |
+| `backup_plan_has_succeeded_job` | Gauge | `1` = Plan hatte mindestens einmal einen SUCCEEDED-Job, `0` = noch nie erfolgreich |
 
 **Backup-Job**
 
@@ -505,6 +532,9 @@ Alle Metriken tragen die Labels `manager_id`, `instance_id` und `instance_name`,
 | `backup_job_last_status` | Gauge | `1` = letzter Job SUCCEEDED, `0` = anderweitig |
 | `backup_job_last_age_hours` | Gauge | Alter des letzten Backups in Stunden; `-1` = kein Job gefunden |
 | `backup_job_last_filesize_bytes` | Gauge | Gemeldete Dateigröße des letzten Backups in Bytes |
+| `backup_job_last_duration_ms` | Gauge | Gesamte Ausführungszeit des letzten Backup-Jobs in Millisekunden |
+| `backup_job_consecutive_failures` | Gauge | Anzahl aufeinanderfolgender Fehler seit dem letzten Erfolg; `0` = zuletzt erfolgreich |
+| `backup_job_overdue` | Gauge | `1` = Backup überfällig gemäß Cron-Plan und Toleranz; `0` = rechtzeitig; `-1` = nicht bestimmbar |
 | `backup_job_success_total` | Counter | Gesamtanzahl erfolgreicher Job-Prüfungen |
 | `backup_job_failure_total` | Counter | Gesamtanzahl fehlgeschlagener Job-Prüfungen |
 
@@ -512,13 +542,18 @@ Alle Metriken tragen die Labels `manager_id`, `instance_id` und `instance_name`,
 
 | Metrik | Typ | Beschreibung |
 |---|---|---|
+| `backup_s3_bucket_accessible` | Gauge | `1` = S3-Bucket antwortet auf eine Metadatenanfrage |
 | `backup_s3_file_exists` | Gauge | `1` = Backup-Datei in S3 gefunden |
-| `backup_s3_size_match` | Gauge | `1` = Dateigröße innerhalb der konfigurierten Toleranz |
-| `backup_s3_accessible` | Gauge | `1` = Datei-Bytes per Range-Request abrufbar |
-| `backup_s3_magic_bytes_valid` | Gauge | `1` = Datei beginnt mit gültigen gzip Magic Bytes (`1F 8B`) |
-| `backup_s3_size_deviation_percent` | Gauge | Abweichung zwischen gemeldeter und tatsächlicher Dateigröße in Prozent |
-| `backup_s3_all_checks_passed` | Gauge | `1` = alle vier S3-Prüfungen bestanden |
+| `backup_s3_size_match` | Gauge | `1` = tatsächliche S3-Dateigröße stimmt exakt mit der vom Backup-Agent gemeldeten überein |
 | `backup_s3_file_size_bytes` | Gauge | Tatsächliche Dateigröße in S3 in Bytes |
+| `backup_s3_size_shrink_warning` | Gauge | `1` = Datei ist signifikant kleiner als beim vorherigen Lauf (Schwellwert konfigurierbar) |
+| `backup_s3_size_growth_warning` | Gauge | `1` = Datei ist signifikant größer als beim vorherigen Lauf (Schwellwert konfigurierbar) |
+| `backup_s3_accessible` | Gauge | `1` = Datei-Bytes per Range-Request abrufbar |
+| `backup_s3_magic_bytes_valid` | Gauge | `1` = Datei beginnt mit einer gültigen Archiv-Signatur: gzip (`1F 8B`) oder unkomprimiertes tar (ustar an Offset 257) |
+| `backup_s3_duration_growth_warning` | Gauge | `1` = Backup-Laufzeit ist gegenüber dem vorherigen Lauf signifikant gestiegen |
+| `backup_s3_file_count` | Gauge | Anzahl aktuell gespeicherter Backup-Dateien unter dem S3-Präfix des Plans |
+| `backup_s3_expected_file_count` | Gauge | Erwartete Dateianzahl laut Retention-Einstellungen des Plans (wird nur ausgegeben, wenn bestimmbar) |
+| `backup_s3_all_checks_passed` | Gauge | `1` = Existenz, Größenübereinstimmung, Zugänglichkeit und Magic Bytes bestanden |
 
 **Restore-Test**
 
@@ -543,7 +578,8 @@ Das Schema wird von Liquibase verwaltet und automatisch angelegt. Folgende Tabel
 | Tabelle | Zweck |
 |---|---|
 | `monitor_run` | Je eine Zeile pro Job-Prüfungs- oder Restore-Test-Ausführung; durch Retention bereinigt |
-| `s3_check_result` | Detaillierte S3-Verifikationsergebnisse; durch Retention bereinigt |
+| `s3_check_result` | Detaillierte S3-Verifikationsergebnisse inkl. Größe, Trend-Warnungen, Dateianzahl und Magic Bytes; durch Retention bereinigt |
+| `instance_job_state` | Persistenter Zustand je Instanz: Zähler aufeinanderfolgender Fehler und ob je ein erfolgreicher Job beobachtet wurde |
 | `restore_test_result` | Detaillierte Restore-Test-Ergebnisse inkl. Abfrageergebnissen pro Query (JSONB) |
 | `sandbox_registry` | Persistente Registry provisionierter CF-Sandbox-Instanzen |
 | `stored_token` | Verschlüsselte UAA-Zugriffstoken pro Manager |
