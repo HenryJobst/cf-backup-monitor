@@ -43,6 +43,9 @@ public class S3CheckResultEntity {
     @Column(name = "size_match")
     private boolean sizeMatch;
 
+    @Column(name = "size_shrink_warning")
+    private boolean sizeShrinkWarning;
+
     @Column(name = "accessible")
     private boolean accessible;
 
@@ -69,6 +72,7 @@ public class S3CheckResultEntity {
         entity.setSizeExpectedBytes(result.getSizeExpectedBytes());
         entity.setSizeActualBytes(result.getSizeActualBytes());
         entity.setSizeMatch(result.isSizeMatch());
+        entity.setSizeShrinkWarning(result.isSizeShrinkWarning());
         entity.setAccessible(result.isAccessible());
         entity.setMagicBytesValid(result.isMagicBytesValid());
         entity.setAllPassed(result.isAllPassed());

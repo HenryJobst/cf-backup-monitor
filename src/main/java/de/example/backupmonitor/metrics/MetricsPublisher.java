@@ -114,6 +114,9 @@ public class MetricsPublisher {
         getOrRegisterGauge(MetricNames.S3_MAGIC_BYTES_VALID, tags,
                 "1 = file has valid archive signature (gzip or tar)")
                 .set(result.isMagicBytesValid() ? 1.0 : 0.0);
+        getOrRegisterGauge(MetricNames.S3_SIZE_SHRINK_WARNING, tags,
+                "1 = backup file is significantly smaller than previous backup")
+                .set(result.isSizeShrinkWarning() ? 1.0 : 0.0);
         getOrRegisterGauge(MetricNames.S3_ALL_CHECKS_PASSED, tags,
                 "1 = all S3 checks passed (exists, size, accessible, magic bytes)")
                 .set(result.isAllPassed() ? 1.0 : 0.0);

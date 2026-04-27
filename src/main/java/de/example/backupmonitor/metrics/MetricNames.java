@@ -29,6 +29,7 @@ public final class MetricNames {
     public static final String S3_SIZE_MATCH            = "backup_s3_size_match";
     public static final String S3_ACCESSIBLE            = "backup_s3_accessible";
     public static final String S3_MAGIC_BYTES_VALID     = "backup_s3_magic_bytes_valid";
+    public static final String S3_SIZE_SHRINK_WARNING    = "backup_s3_size_shrink_warning";
     public static final String S3_ALL_CHECKS_PASSED     = "backup_s3_all_checks_passed";
     public static final String S3_FILE_SIZE_BYTES       = "backup_s3_file_size_bytes";
 }

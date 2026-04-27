@@ -32,6 +32,9 @@ public class S3VerificationService {
     @Value("${cf-backup-monitor.s3-verification.accessibility-check-bytes:1024}")
     private int accessibilityBytes;
 
+    @Value("${cf-backup-monitor.s3-verification.shrink-warning-threshold-percent:20}")
+    private int shrinkWarningThresholdPercent;
+
     public S3CheckResult verify(String managerId, String instanceId,
                                  String instanceName, BackupJob job) {
         if (!(job.getDestination() instanceof S3FileDestination dest)) {
@@ -78,6 +81,9 @@ public class S3VerificationService {
                 result.setSizeMatch(s3Size > 0);
             }
 
+            // ── b2) SHRINK ───────────────────────────────────────────────
+            checkShrink(result, instanceId, s3Size);
+
             // ── c) ACCESSIBLE ────────────────────────────────────────────
             int bytesToFetch = Math.max(accessibilityBytes, TAR_MIN_BYTES);
             byte[] firstBytes = downloadPartial(s3, dest.getBucket(), filename, bytesToFetch);
@@ -109,6 +115,20 @@ public class S3VerificationService {
         }
 
         return finalize(result, managerId, instanceId, instanceName);
+    }
+
+    private void checkShrink(S3CheckResult result, String instanceId, long currentSize) {
+        if (currentSize <= 0) return;
+        repository.findLatestPassedForInstance(instanceId).ifPresent(prev -> {
+            if (prev.getSizeActualBytes() == null || prev.getSizeActualBytes() <= 0) return;
+            long prevSize = prev.getSizeActualBytes();
+            double shrinkPct = (double) (prevSize - currentSize) / prevSize * 100.0;
+            if (shrinkPct >= shrinkWarningThresholdPercent) {
+                result.setSizeShrinkWarning(true);
+                log.warn("Backup file shrank by {:.1f}% (prev={} B, now={} B) for instance {}",
+                        shrinkPct, prevSize, currentSize, instanceId);
+            }
+        });
     }
 
     private boolean isGzip(byte[] bytes) {

@@ -51,6 +51,7 @@ cf-backup-monitor:
   s3-verification:
     enabled:                   ${S3_VERIFY_ENABLED:true}
     accessibility-check-bytes: ${S3_ACCESSIBILITY_BYTES:1024}
+    shrink-warning-threshold-percent: ${S3_SHRINK_THRESHOLD:20}
 
   retention:
     job-check-entries:         ${RETENTION_JOB_CHECK:30}
