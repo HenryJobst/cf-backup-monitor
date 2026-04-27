@@ -112,9 +112,10 @@ Each entry represents one OSB backup manager instance.
 | `cf.service-account.username` | `MANAGER_1_SA_USERNAME` | CF service account username |
 | `cf.service-account.password` | `MANAGER_1_SA_PASSWORD` | CF service account password |
 | `instances[].id` | `MANAGER_1_INSTANCE_1_ID` | CF service instance GUID |
-| `instances[].name` | `MANAGER_1_INSTANCE_1_NAME` | Human-readable instance name |
+| `instances[].name` | `MANAGER_1_INSTANCE_1_NAME` | Human-readable instance name used as backup plan name |
 | `instances[].s3-instance-name` | `MANAGER_1_INSTANCE_1_S3_NAME` | Name of the S3 service instance for this backup (overrides offering-label search) |
 | `instances[].s3-service-plan` | `MANAGER_1_INSTANCE_1_S3_PLAN` | CF service plan for S3 (e.g. `5gb`); required only if the instance should be created automatically |
+| `instances[].items` | – | List of DB schema/database names to include in the backup (e.g. `["mydb"]`). Required for auto-provisioning to succeed. |
 
 #### Auto-Provisioning (`cf-backup-monitor.auto-provision`)
 
@@ -125,6 +126,10 @@ Automatically creates a backup plan when none exists for a configured service in
 | `cf-backup-monitor.auto-provision.enabled` | `AUTO_PROVISION_ENABLED` | `false` | Enable auto-provisioning |
 | `cf-backup-monitor.auto-provision.s3-service-label` | `AUTO_PROVISION_S3_LABEL` | `s3` | CF service offering name of the S3 store (e.g. `ecs-bucket`) |
 | `cf-backup-monitor.auto-provision.backup-schedule` | `AUTO_PROVISION_SCHEDULE` | `0 2 * * *` | Cron schedule for the new backup plan (5-field) |
+| `cf-backup-monitor.auto-provision.retention-style` | `AUTO_PROVISION_RETENTION_STYLE` | `FILES` | Retention strategy: `ALL`, `DAYS`, `FILES`, or `HOURS` |
+| `cf-backup-monitor.auto-provision.retention-period` | `AUTO_PROVISION_RETENTION_PERIOD` | `7` | Number of backups/days/hours to retain (must be > 0) |
+| `cf-backup-monitor.auto-provision.timezone` | `AUTO_PROVISION_TIMEZONE` | `UTC` | Timezone for the backup schedule (e.g. `Europe/Berlin`) |
+| `cf-backup-monitor.auto-provision.plan-name` | `AUTO_PROVISION_PLAN_NAME` | `Auto-Backup` | Default backup plan name (overridden by `instances[].name`) |
 
 Prerequisites: `cf.space-guid` must be set per manager. If `instances[].s3-instance-name` is set and the instance does not exist yet, it is created automatically when `instances[].s3-service-plan` is also configured.
 
@@ -388,9 +393,10 @@ Jeder Eintrag repräsentiert eine OSB-Backup-Manager-Instanz.
 | `cf.service-account.username` | `MANAGER_1_SA_USERNAME` | CF-Service-Account-Benutzername |
 | `cf.service-account.password` | `MANAGER_1_SA_PASSWORD` | CF-Service-Account-Passwort |
 | `instances[].id` | `MANAGER_1_INSTANCE_1_ID` | CF-Service-Instanz-GUID |
-| `instances[].name` | `MANAGER_1_INSTANCE_1_NAME` | Menschenlesbarer Instanzname |
+| `instances[].name` | `MANAGER_1_INSTANCE_1_NAME` | Menschenlesbarer Instanzname, wird als Backup-Plan-Name verwendet |
 | `instances[].s3-instance-name` | `MANAGER_1_INSTANCE_1_S3_NAME` | Name der S3-Service-Instanz für das Auto-Provisioning (optional) |
 | `instances[].s3-service-plan` | `MANAGER_1_INSTANCE_1_S3_PLAN` | CF-Service-Plan für das automatische Anlegen der S3-Instanz (optional) |
+| `instances[].items` | – | Liste der zu sichernden DB-Schemas/Datenbanknamen (z.B. `["meindb"]`). Pflichtfeld für erfolgreiches Auto-Provisioning. |
 
 #### Auto-Provisioning
 
@@ -400,7 +406,11 @@ Wenn kein Backup-Plan für eine Instanz existiert, kann die Anwendung automatisc
 |---|---|---|---|
 | `cf-backup-monitor.auto-provision.enabled` | `AUTO_PROVISION_ENABLED` | `false` | Auto-Provisioning aktivieren |
 | `cf-backup-monitor.auto-provision.s3-service-label` | `AUTO_PROVISION_S3_LABEL` | `s3` | CF-Service-Angebots-Label für die S3-Suche im Space |
-| `cf-backup-monitor.auto-provision.backup-schedule` | `AUTO_PROVISION_SCHEDULE` | `0 2 * * *` | Cron-Ausdruck für den neuen Backup-Plan |
+| `cf-backup-monitor.auto-provision.backup-schedule` | `AUTO_PROVISION_SCHEDULE` | `0 2 * * *` | Cron-Ausdruck für den neuen Backup-Plan (5-stellig) |
+| `cf-backup-monitor.auto-provision.retention-style` | `AUTO_PROVISION_RETENTION_STYLE` | `FILES` | Aufbewahrungsstrategie: `ALL`, `DAYS`, `FILES` oder `HOURS` |
+| `cf-backup-monitor.auto-provision.retention-period` | `AUTO_PROVISION_RETENTION_PERIOD` | `7` | Anzahl aufzubewahrender Einheiten (muss > 0 sein) |
+| `cf-backup-monitor.auto-provision.timezone` | `AUTO_PROVISION_TIMEZONE` | `UTC` | Zeitzone für den Backup-Schedule (z.B. `Europe/Berlin`) |
+| `cf-backup-monitor.auto-provision.plan-name` | `AUTO_PROVISION_PLAN_NAME` | `Auto-Backup` | Standard-Backup-Plan-Name (wird durch `instances[].name` übersteuert) |
 
 Voraussetzungen: `auto-provision.enabled=true` und `cf.space-guid` je Manager müssen gesetzt sein.
 Ist `instances[].s3-instance-name` gesetzt, wird genau diese S3-Instanz gesucht (bzw. bei konfiguriertem `s3-service-plan` automatisch angelegt).

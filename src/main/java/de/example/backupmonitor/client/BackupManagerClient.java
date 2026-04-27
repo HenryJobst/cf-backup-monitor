@@ -100,8 +100,9 @@ public class BackupManagerClient {
                                                    int retentionPeriod,
                                                    String timezone,
                                                    String planName,
+                                                   List<String> items,
                                                    S3FileDestination s3) {
-        FileDestination fileDest = getOrCreateFileDestination(managerId, instanceId, s3).orElse(null);
+        FileDestination fileDest = getOrCreateFileDestination(managerId, instanceId, planName, s3).orElse(null);
         if (fileDest == null) {
             log.warn("Could not obtain file destination for instance {}, skipping plan creation", instanceId);
             return Optional.empty();
@@ -122,6 +123,7 @@ public class BackupManagerClient {
             body.put("retentionPeriod", retentionPeriod);
             body.put("timezone", timezone);
             body.put("name", planName);
+            if (!items.isEmpty()) body.put("items", items);
             body.put("fileDestination", destBody);
 
             BackupPlan plan = ep.restClient.post()
@@ -166,10 +168,11 @@ public class BackupManagerClient {
      */
     private Optional<FileDestination> getOrCreateFileDestination(String managerId,
                                                                    String instanceId,
+                                                                   String name,
                                                                    S3FileDestination s3) {
         Optional<FileDestination> existing = getFileDestinationByInstance(managerId, instanceId);
         if (existing.isPresent()) return existing;
-        return createFileDestination(managerId, instanceId, s3);
+        return createFileDestination(managerId, instanceId, name, s3);
     }
 
     private Optional<FileDestination> getFileDestinationByInstance(String managerId, String instanceId) {
@@ -189,11 +192,12 @@ public class BackupManagerClient {
     }
 
     private Optional<FileDestination> createFileDestination(String managerId, String instanceId,
-                                                             S3FileDestination s3) {
+                                                             String name, S3FileDestination s3) {
         try {
             ManagerEndpoint ep = endpoints.get(managerId);
             Map<String, Object> body = new HashMap<>();
             body.put("type", "S3");
+            body.put("name", name);
             body.put("serviceInstance", Map.of("service_instance_id", instanceId));
             body.put("authKey", s3.getAuthKey());
             body.put("authSecret", s3.getAuthSecret());

@@ -114,6 +114,8 @@ public class MonitoringConfig {
         private String s3InstanceName;
         /** CF-Service-Plan für die S3-Instanz (z.B. "5gb"). Wird genutzt, falls die Instanz neu angelegt werden muss. */
         private String s3ServicePlan;
+        /** DB-Schemas/Items, die gesichert werden sollen (z.B. ["meindb"]). Pflichtfeld für Auto-Provisioning. */
+        private List<String> items = new ArrayList<>();
     }
 
     @Data

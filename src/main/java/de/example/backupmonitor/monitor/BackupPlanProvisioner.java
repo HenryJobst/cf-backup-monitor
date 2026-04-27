@@ -62,10 +62,13 @@ public class BackupPlanProvisioner {
 
             String planName = (instance.getName() != null && !instance.getName().isBlank())
                     ? instance.getName() : ap.getPlanName();
+            if (instance.getItems().isEmpty()) {
+                log.warn("Auto-provision: keine items für Instanz {} konfiguriert – Backup-Plan wird ohne Items angelegt", instanceId);
+            }
             Optional<BackupPlan> plan = managerClient.createBackupPlan(
                     managerId, instanceId, ap.getBackupSchedule(),
                     ap.getRetentionStyle(), ap.getRetentionPeriod(),
-                    ap.getTimezone(), planName, destination);
+                    ap.getTimezone(), planName, instance.getItems(), destination);
 
             plan.ifPresentOrElse(
                     p -> log.info("Backup-Plan erfolgreich angelegt für Instanz {} "
