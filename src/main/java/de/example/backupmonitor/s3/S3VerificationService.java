@@ -1,6 +1,7 @@
 package de.example.backupmonitor.s3;
 
 import de.example.backupmonitor.metrics.MetricsPublisher;
+import de.example.backupmonitor.model.AgentExecutionResponse;
 import de.example.backupmonitor.model.BackupJob;
 import de.example.backupmonitor.model.S3FileDestination;
 import lombok.RequiredArgsConstructor;
@@ -137,18 +138,31 @@ public class S3VerificationService {
     }
 
     private String resolveFilename(BackupJob job) {
+        String filename = extractRawFilename(job);
+        return prependPlanId(filename, job);
+    }
+
+    private String extractRawFilename(BackupJob job) {
         if (job.getFiles() != null && !job.getFiles().isEmpty()) {
             return job.getFiles().values().iterator().next();
         }
         if (job.getAgentExecutionReponses() != null) {
             return job.getAgentExecutionReponses().values().stream()
-                    .map(r -> r.getFilename())
+                    .map(AgentExecutionResponse::getFilename)
                     .filter(f -> f != null && !f.isBlank())
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException(
                             "No filename in job " + job.getIdAsString()));
         }
         throw new IllegalStateException("No filename in job " + job.getIdAsString());
+    }
+
+    private String prependPlanId(String filename, BackupJob job) {
+        if (filename.contains("/")) return filename;
+        if (job.getBackupPlan() == null) return filename;
+        String planId = job.getBackupPlan().getIdAsString();
+        if (planId == null || planId.isBlank()) return filename;
+        return planId + "/" + filename;
     }
 
     private long resolveReportedSize(BackupJob job) {

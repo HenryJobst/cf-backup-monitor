@@ -17,6 +17,8 @@ public class BackupJob {
 
     private JobStatus status;
 
+    private BackupPlan backupPlan;
+
     private Instant startDate;
 
     private Instant endDate;
