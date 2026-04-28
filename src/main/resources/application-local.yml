@@ -23,20 +23,32 @@ cf-backup-monitor:
           username: ${SA_LOCAL_USERNAME}
           password: ${SA_LOCAL_PASSWORD}
       instances:
-        - id:               ${LOCAL_INSTANCE_ID:test-instance-001}
-          name:             pg-local-test
+        - id:               ${LOCAL_INSTANCE_1_ID:test-instance-001}
+          name:             pg-local-test-1
           s3-instance-name: ${LOCAL_S3_INSTANCE_NAME:}
           s3-service-plan:  ${LOCAL_S3_SERVICE_PLAN:}
+        - id:               ${LOCAL_INSTANCE_2_ID:test-instance-002}
+          name:             pg-local-test-2
+          s3-instance-name: ${LOCAL_S3_INSTANCE_2_NAME:}
+          s3-service-plan:  ${LOCAL_S3_INSTANCE_2_PLAN:}
 
   restore-test:
     enabled: ${RESTORE_TEST_ENABLED:false}
     sandboxes:
-      - instance-id: ${LOCAL_INSTANCE_ID:test-instance-001}
+      - instance-id: ${LOCAL_INSTANCE_1_ID:test-instance-001}
         mode: existing
         existing:
           host:     localhost
           port:     5433
-          database: restore_sandbox
+          database: sandbox_instance1
+          username: ${SANDBOX_LOCAL_USER:sandbox_user}
+          password: ${SANDBOX_LOCAL_PASS:sandbox_pass}
+      - instance-id: ${LOCAL_INSTANCE_2_ID:test-instance-002}
+        mode: existing
+        existing:
+          host:     localhost
+          port:     5433
+          database: sandbox_instance2
           username: ${SANDBOX_LOCAL_USER:sandbox_user}
           password: ${SANDBOX_LOCAL_PASS:sandbox_pass}
 
