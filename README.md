@@ -334,6 +334,29 @@ After a successful restore, each configured SQL query is executed against the sa
 
 ---
 
+### GitLab CI/CD Variables
+
+The following variables must be configured in GitLab under **Settings → CI/CD → Variables**. Mark sensitive values as **Protected** and **Masked**.
+
+#### Deploy
+
+| Variable | Required | Description |
+|---|---|---|
+| `CF_API` | yes | CloudFoundry API endpoint, e.g. `https://api.cf.example.com` |
+| `CF_USERNAME` | yes | CF service account username |
+| `CF_PASSWORD` | yes | CF service account password |
+| `CF_ORG` | yes | CF organization to deploy into |
+| `CF_SPACE` | yes | CF space to deploy into |
+| `CF_DEPLOY_IMAGE` | no | Docker image used for the deploy job; must contain the CF CLI (`cf`). Defaults to `ubuntu:24.04` — override with a pre-built image to avoid runtime installation, e.g. `registry.example.com/tools/cf-cli:8`. |
+
+#### Test
+
+| Variable | Required | Description |
+|---|---|---|
+| `MAVEN_OPTS` | no | Additional Maven JVM options. Default: `-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository` |
+
+---
+
 ### Running Tests
 
 ```bash
@@ -681,6 +704,29 @@ Nach erfolgreicher Rücksicherung wird jede konfigurierte SQL-Abfrage gegen die 
 - SQL-Validierungsabfragen sind auf `SELECT`-Anweisungen beschränkt.
 - Es gibt keinen Query-spezifischen Timeout; eine lang laufende Abfrage blockiert den Test bis zum allgemeinen Restore-Timeout.
 - Verwaiste CF-Sandbox-Instanzen aus unterbrochenen Läufen werden durch einen separaten Scheduler bereinigt (`orphan-cleanup-cron`).
+
+---
+
+### GitLab-CI/CD-Variablen
+
+Folgende Variablen müssen in GitLab unter **Settings → CI/CD → Variables** konfiguriert werden. Sensitive Werte als **Protected** und **Masked** markieren.
+
+#### Deploy
+
+| Variable | Pflicht | Beschreibung |
+|---|---|---|
+| `CF_API` | ja | CloudFoundry-API-Endpunkt, z.B. `https://api.cf.example.com` |
+| `CF_USERNAME` | ja | CF-Service-Account-Benutzername |
+| `CF_PASSWORD` | ja | CF-Service-Account-Passwort |
+| `CF_ORG` | ja | CF-Organisation für das Deployment |
+| `CF_SPACE` | ja | CF-Space für das Deployment |
+| `CF_DEPLOY_IMAGE` | nein | Docker-Image für den Deploy-Job; muss die CF CLI (`cf`) enthalten. Standard: `ubuntu:24.04` — mit einem vorgefertigten Image überschreiben, um die Laufzeit-Installation zu vermeiden, z.B. `registry.example.com/tools/cf-cli:8`. |
+
+#### Test
+
+| Variable | Pflicht | Beschreibung |
+|---|---|---|
+| `MAVEN_OPTS` | nein | Zusätzliche Maven-JVM-Optionen. Standard: `-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository` |
 
 ---
 
