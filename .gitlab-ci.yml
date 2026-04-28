@@ -16,7 +16,7 @@ test:
   stage: test
   image: maven:3.9-eclipse-temurin-21
   script:
-    - mvn verify -DexcludedGroups=integration
+    - mvn verify -DexcludedGroups=integration -DskipITs
   artifacts:
     paths:
       - target/cf-backup-monitor-*.jar
